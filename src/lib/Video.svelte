@@ -1,40 +1,145 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import Hls from 'hls.js';
+	import { toast } from 'svelte-french-toast';
+
+	interface Playlist {
+		name: string;
+		entries: { name: string, url: string }[];
+	}
 
 	let videoElement: HTMLVideoElement | null = null;
 	let devices: MediaDeviceInfo[] = [];
-	let selectedDeviceId: string = "";
+	let devicesIds: string[] = ['screen'];
+	let deviceIndex: number = 0;
 	let mediaIndex: number = 0;
-	let playlist: any = null;
+	let playlists: Playlist[];
+	let playlistIndex: number = 0;
+	let mode = 0;
 
-	// Fetch available video input devices (cameras)
+	$: playlist = playlists && playlists[playlistIndex];
+	$: media = playlist && playlist.entries[mediaIndex];
+
 	async function getCameras(): Promise<void> {
 		await navigator.mediaDevices.getUserMedia({audio: true, video: true});
 
 		console.log("Getting cameras...");
 		const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-		devices = [...mediaDevices.filter((device) => device.kind === "videoinput")];
+		devices = mediaDevices.filter((device) => device.kind === "videoinput");
+		devicesIds = [
+			...devices.map((device) => device.deviceId),
+			'screen',
+		];
 
 		console.log(mediaDevices);
+	}
 
-		// Ensure Svelte updates state by using a reactive assignment
-		if (devices.length > 0) {
-			selectedDeviceId = devices[0].deviceId;
+	$: {
+		if (mode === 0) {
+			if (deviceIndex >= devicesIds.length) {
+				deviceIndex = 0;
+			} else if (deviceIndex < 0) {
+				deviceIndex = devicesIds.length - 1;
+			}
+		} else if (mode === 2) {
+			if (mediaIndex >= playlist.entries.length) {
+				mediaIndex = 0;
+			} else if (mediaIndex < 0) {
+				mediaIndex = playlist.entries.length - 1;
+			}
 		}
 	}
 
-	$: if(selectedDeviceId) {
-		if (selectedDeviceId === 'screen') {
-			startScreenCapture();
-		} else {
-			startCamera(selectedDeviceId);
+	$: {
+		if (mode === 2) {
+			if (playlistIndex >= playlists.length) {
+				playlistIndex = 0;
+			} else if (playlistIndex < 0) {
+				playlistIndex = playlists.length - 1;
+			}
 		}
 	}
 
-	// Start the selected camera
+	$: selectedDeviceId = devicesIds[deviceIndex];
+
+	$: {
+		if (mode === 0) {
+			if (selectedDeviceId === 'screen') {
+				startScreenCapture();
+			} else {
+				startCamera(selectedDeviceId);
+			}
+		} else if (mode === 1) {
+			startHLS();
+		} else if (mode === 2) {
+			playMedia(media.url);
+		}
+	}
+
+	$: {
+		if (mode === 2 && playlist) {
+			toast(`Playlist: ${playlist.name}`);
+		}
+	}
+
+	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
+		if (buttonIndex == 8) { // minus/select
+			if (!isPressed) return;
+
+			if (mode === 2) {
+				mode = 0;
+			} else {
+				mode++;
+			}
+		} else if (buttonIndex == 9) { // plus/start
+			if (!isPressed) return;
+
+			if (mode === 0) {
+				mode = 2;
+			} else {
+				mode--;
+			}
+		} else if (buttonIndex == 4) { // left trigger
+			if (!isPressed) return;
+
+			if (mode === 0) {
+				deviceIndex--;
+			} else if (mode === 2) {
+				mediaIndex--;
+			}
+		} else if (buttonIndex == 5) { // right trigger
+			if (!isPressed) return;
+
+			if (mode === 0) {
+				deviceIndex++;
+			} else if (mode === 2) {
+				mediaIndex++;
+			}
+		}else if (buttonIndex == 6) { // left trigger
+			if (!isPressed) return;
+
+			 if (mode === 2) {
+				 playlistIndex--;
+			}
+		} else if (buttonIndex == 7) { // right trigger
+			if (!isPressed) return;
+
+			 if (mode === 2) {
+				playlistIndex++;
+			}
+		} else if (buttonIndex == 16) { // home
+			if (!isPressed) return;
+
+			reload();
+		}
+	}
+
+	export function onAxesStateChange(): void {
+	}
+
 	async function startCamera(deviceId: string): Promise<void> {
-		console.log("Starting camera:", deviceId);
+		const label = devices.find((device) => device.deviceId === deviceId)?.label;
+		toast(`Starting camera: ${label}`);
 
 		if (!deviceId) return;
 
@@ -47,10 +152,7 @@
 		}
 	}
 
-	// Start screen capture
 	async function startScreenCapture(): Promise<void> {
-		console.log("Starting screen capture");
-
 		try {
 			const stream = await navigator.mediaDevices.getDisplayMedia({
 				video: true
@@ -59,15 +161,11 @@
 			if (videoElement) {
 				videoElement.srcObject = stream;
 			}
-		} catch (err) {
-			console.error("Error starting screen capture:", err);
-		}
-	}
 
-	// Handle camera selection change
-	function handleDeviceChange(event: Event): void {
-		const target = event.target as HTMLSelectElement;
-		selectedDeviceId = target.value;
+			toast("Started screen capture");
+		} catch {
+			toast("Failed to start screen capture");
+		}
 	}
 
 	function startHLS() {
@@ -76,17 +174,17 @@
 		videoElement.srcObject = null;
 
 		const hls = new Hls();
-		hls.loadSource('https://live.corusdigitaldev.com/groupd/live/49a91e7f-1023-430f-8d66-561055f3d0f7/live.isml/master.m3u8');
+		hls.loadSource('http://fl1.moveonjoy.com/NICKELODEON/index.m3u8');
 		hls.attachMedia(videoElement);
 		hls.on(Hls.Events.MANIFEST_PARSED, function() {
 			videoElement!.play();
 		});
 	}
-	async function playMedia() {
+	async function playMedia(url: string) {
 		if (!videoElement) return;
 
 		videoElement.srcObject = null;
-		videoElement.src = playlist.entries[mediaIndex].url;
+		videoElement.src = url;
 
 		videoElement.onended = () => {
 			mediaIndex++;
@@ -95,24 +193,19 @@
 		await videoElement.play();
 	}
 
-	$: if(mediaIndex) {
-		if (mediaIndex >= playlist.entries.length) {
-			mediaIndex = 0;
-		} else if (mediaIndex < 0) {
-			mediaIndex = playlist.entries.length - 1;
-		}
-
-		playMedia();
+	async function loadPlaylists() {
+		const resp = await fetch('/playlists.json');
+		playlists = await resp.json();
 	}
 
-	async function startPlaylist() {
-		const resp = await fetch('/playlists/1.json');
-		playlist = await resp.json();
-
-		await playMedia();
+	function reload() {
+		getCameras();
+		loadPlaylists();
 	}
 
-	onMount(getCameras);
+	onMount(() => {
+		reload();
+	});
 </script>
 
 <style>
@@ -125,35 +218,6 @@
         object-fit: cover;
         z-index: -1;
     }
-    .controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 10px;
-        border-radius: 8px;
-    }
-    select {
-        color: white;
-        background: black;
-        border: 1px solid white;
-        padding: 5px;
-    }
 </style>
-
-<div class="controls">
-	<label for="camera-select">Select Camera:</label>
-	<select id="camera-select" on:change={handleDeviceChange} bind:value={selectedDeviceId}>
-		<option value="screen">Screen Capture</option>
-		{#each devices as device (device.deviceId)}
-			<option value={device.deviceId}>
-				{device.label || `Camera ${devices.indexOf(device) + 1}`}
-			</option>
-		{/each}
-	</select>
-	<button on:click={getCameras}>Refresh</button>
-	<button on:click={startHLS}>HLS</button>
-	<button on:click={startPlaylist}>Playlist</button>
-</div>
 
 <video autoplay bind:this={videoElement}></video>
