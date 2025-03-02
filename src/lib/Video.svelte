@@ -2,26 +2,28 @@
 	import { onMount } from "svelte";
 	import Hls from 'hls.js';
 	import { toast } from 'svelte-french-toast';
+	import SwitchPro from '$lib/Controllers';
 
 	interface Playlist {
 		name: string;
 		entries: { name: string, url: string }[];
 	}
 
-	let videoElement: HTMLVideoElement | null = null;
+	export let videoElement: HTMLVideoElement | null = null;
 	let devices: MediaDeviceInfo[] = [];
 	let devicesIds: string[] = ['screen'];
 	let deviceIndex: number = 0;
 	let mediaIndex: number = 0;
 	let playlists: Playlist[];
 	let playlistIndex: number = 0;
-	let mode = 0;
+	let mode = 2;
+	let loop = true;
 
 	$: playlist = playlists && playlists[playlistIndex];
 	$: media = playlist && playlist.entries[mediaIndex];
 
 	async function getCameras(): Promise<void> {
-		await navigator.mediaDevices.getUserMedia({audio: true, video: true});
+		await navigator.mediaDevices.getUserMedia({video: true});
 
 		console.log("Getting cameras...");
 		const mediaDevices = await navigator.mediaDevices.enumerateDevices();
@@ -41,7 +43,7 @@
 			} else if (deviceIndex < 0) {
 				deviceIndex = devicesIds.length - 1;
 			}
-		} else if (mode === 2) {
+		} else if (mode === 2 && playlist) {
 			if (mediaIndex >= playlist.entries.length) {
 				mediaIndex = 0;
 			} else if (mediaIndex < 0) {
@@ -51,7 +53,7 @@
 	}
 
 	$: {
-		if (mode === 2) {
+		if (mode === 2 && playlists) {
 			if (playlistIndex >= playlists.length) {
 				playlistIndex = 0;
 			} else if (playlistIndex < 0) {
@@ -63,15 +65,27 @@
 	$: selectedDeviceId = devicesIds[deviceIndex];
 
 	$: {
+		toast(`Loop: ${loop ? 'ON' : 'OFF'}`);
+	}
+
+	$: {
 		if (mode === 0) {
 			if (selectedDeviceId === 'screen') {
 				startScreenCapture();
 			} else {
 				startCamera(selectedDeviceId);
 			}
-		} else if (mode === 1) {
+		}
+	}
+
+	$: {
+		if (mode === 1) {
 			startHLS();
-		} else if (mode === 2) {
+		}
+	}
+
+	$: {
+		if (mode === 2 && media) {
 			playMedia(media.url);
 		}
 	}
@@ -83,7 +97,7 @@
 	}
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
-		if (buttonIndex == 8) { // minus/select
+		if (buttonIndex == SwitchPro.SELECT) {
 			if (!isPressed) return;
 
 			if (mode === 2) {
@@ -91,7 +105,7 @@
 			} else {
 				mode++;
 			}
-		} else if (buttonIndex == 9) { // plus/start
+		} else if (buttonIndex == SwitchPro.START) {
 			if (!isPressed) return;
 
 			if (mode === 0) {
@@ -99,7 +113,7 @@
 			} else {
 				mode--;
 			}
-		} else if (buttonIndex == 4) { // left trigger
+		} else if (buttonIndex == SwitchPro.LT) {
 			if (!isPressed) return;
 
 			if (mode === 0) {
@@ -107,7 +121,7 @@
 			} else if (mode === 2) {
 				mediaIndex--;
 			}
-		} else if (buttonIndex == 5) { // right trigger
+		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
 
 			if (mode === 0) {
@@ -115,22 +129,26 @@
 			} else if (mode === 2) {
 				mediaIndex++;
 			}
-		}else if (buttonIndex == 6) { // left trigger
+		}else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
 
 			 if (mode === 2) {
 				 playlistIndex--;
 			}
-		} else if (buttonIndex == 7) { // right trigger
+		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
 
 			 if (mode === 2) {
 				playlistIndex++;
 			}
-		} else if (buttonIndex == 16) { // home
+		} else if (buttonIndex == SwitchPro.HOME) {
 			if (!isPressed) return;
 
 			reload();
+		} else if (buttonIndex == SwitchPro.D_LEFT) {
+			if (!isPressed) return;
+
+			loop = !loop;
 		}
 	}
 
@@ -217,7 +235,9 @@
         height: 100vh;
         object-fit: cover;
         z-index: -1;
+				cursor: none;
+				background: black;
     }
 </style>
 
-<video autoplay bind:this={videoElement}></video>
+<video autoplay muted bind:this={videoElement} loop={loop || null} />

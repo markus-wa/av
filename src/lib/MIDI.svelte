@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-french-toast';
+	import SwitchPro from '$lib/Controllers.js';
 
 	let axesState: ReadonlyArray<number> = [0,0,0,0];
 	let midiAccess: MIDIAccess | null = null;
@@ -17,21 +18,21 @@
 	let toggleState: { [key: number]: boolean } = {};
 
 	const gates: { [key: number]: number } = {
-		0: 4,
-		1: 5,
-		2: 6,
-		3: 7,
-		6: 8,
-		7: 9,
+		[SwitchPro.B]: 4,
+		[SwitchPro.A]: 5,
+		[SwitchPro.Y]: 6,
+		[SwitchPro.X]: 7,
+		[SwitchPro.LT2]: 8,
+		[SwitchPro.RT2]: 9,
 	};
 
 	const toggles: { [key: number]: number } = {
-		4: 10,
-		5: 11,
-		12: 12,
-		13: 13,
-		14: 14,
-		15: 15,
+		[SwitchPro.LT]: 10,
+		[SwitchPro.RT]: 11,
+		[SwitchPro.D_UP]: 12,
+		[SwitchPro.D_DOWN]: 13,
+		[SwitchPro.D_LEFT]: 14,
+		[SwitchPro.D_RIGHT]: 15,
 	};
 
 	// Gates
@@ -43,8 +44,10 @@
 		try {
 			midiAccess = await navigator.requestMIDIAccess();
 			midiOutputs = Array.from(midiAccess.outputs.values());
+			selectedMidiIndex = Math.max(midiOutputs.findIndex((output) => output.name?.includes("CH345")), 0);
 			if (midiOutputs.length > 0) {
-				midiOutput = midiOutputs[0];
+				midiOutput = midiOutputs[selectedMidiIndex];
+				console.log(midiOutput, selectedMidiIndex);
 			} else {
 				toast("No MIDI outputs available.");
 			}
@@ -150,7 +153,7 @@
 	}
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
-		if (buttonIndex == 8) {
+		if (buttonIndex == SwitchPro.SELECT) {
 			if (!isPressed) return;
 
 			if (shiftPressed) {
@@ -164,7 +167,7 @@
 			} else {
 				decStepSize();
 			}
-		} else if (buttonIndex == 9) {
+		} else if (buttonIndex == SwitchPro.START) {
 			if (!isPressed) return;
 
 			if (shiftPressed) {
@@ -179,9 +182,9 @@
 			} else {
 				incStepSize();
 			}
-		} else if (buttonIndex === 17) {
+		} else if (buttonIndex === SwitchPro.SCREENSHOT) {
 			shiftPressed = isPressed;
-		} else if (buttonIndex === 16) {
+		} else if (buttonIndex === SwitchPro.HOME) {
 			selectedMidiIndex = 0;
 		}
 

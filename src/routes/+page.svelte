@@ -3,6 +3,7 @@
 	import Video from '$lib/Video.svelte';
 	import MIDI from '$lib/MIDI.svelte';
 	import { toast, Toaster } from 'svelte-french-toast';
+	import Shader from '$lib/Shader.svelte';
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
@@ -11,6 +12,7 @@
 	let gamepadsList: Gamepad[] = [];
 	let videoComponent: Video;
 	let midiComponent: MIDI;
+	let shaderComponent: Shader;
 	let shiftPressed: boolean = false;
 	let controlledComponentIndex: number = 0;
 	let controlledComponents: ControlledComponent[];
@@ -113,4 +115,5 @@
 
 <MIDI bind:this={midiComponent} />
 <Video bind:this={videoComponent} />
+<Shader bind:this={shaderComponent} videoElement={videoComponent?.videoElement}/>
 <Toaster />
