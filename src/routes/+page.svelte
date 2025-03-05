@@ -22,7 +22,7 @@
 		onButtonStateChange(buttonIndex: number, isPressed: boolean): void;
 	}
 
-	$: controlledComponents = [midiComponent, videoComponent];
+	$: controlledComponents = [midiComponent, videoComponent, shaderComponent];
 	$: controlledComponent = controlledComponents[controlledComponentIndex];
 	$: gamepad = gamepadsList[selectedGamepadIndex];
 
@@ -39,6 +39,8 @@
 			toast("Mode: Video");
 		} else if (controlledComponent === midiComponent) {
 			toast("Mode: MIDI");
+		} else if (controlledComponent === shaderComponent) {
+			toast("Mode: Shader");
 		}
 	}
 

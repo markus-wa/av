@@ -133,7 +133,7 @@
 	}
 
 	function incStepSize(): void {
-		let inc = Math.floor(stepSize / 3);
+		let inc = Math.floor(stepSize / 2);
 
 		if (inc === 0) {
 			inc = 1;
@@ -150,6 +150,10 @@
 		}
 
 		setStepSize(stepSize - dec);
+	}
+
+	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
+		axesState = axes;
 	}
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
@@ -209,10 +213,6 @@
 				sendMIDINoteOff(toggleCh, 60);
 			}
 		}
-	}
-
-	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
-		axesState = axes;
 	}
 
 	onMount(() => {

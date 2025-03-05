@@ -1,47 +1,73 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import * as THREE from "three";
+	import Stepper from '$lib/Stepper.svelte';
+	import { ColorGrading, CRT, type Shader } from '$lib/Shaders';
+	import SwitchPro from '$lib/Controllers';
+	import { UniformsUtils } from 'three';
 
 	export let videoElement: HTMLVideoElement | null = null;
 
-	let container: HTMLDivElement | null = null;
 	let renderer: THREE.WebGLRenderer | null = null;
 	let scene: THREE.Scene;
 	let camera: THREE.PerspectiveCamera;
 	let material: THREE.ShaderMaterial;
 	let animationFrameId: number;
 	let texture: THREE.Texture | null = null;
+	let stepper: Stepper;
+	const shaders: Shader[] = [CRT, ColorGrading];
+	let shaderIndex = 0;
 
-	const crtShader = {
-		uniforms: {
-			tDiffuse: { value: null },
-			time: { value: 0.0 }
-		},
-		vertexShader: `
-			varying vec2 vUv;
-			void main() {
-				vUv = uv;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-			}
-		`,
-		fragmentShader: `
-			varying vec2 vUv;
-			uniform sampler2D tDiffuse;
-			uniform float time;
-			void main() {
-				vec2 uv = vUv;
-				float scanline = sin(uv.y * 800.0 + time * 5.0) * 0.1;
-				vec4 color = texture2D(tDiffuse, uv);
-				color.rgb += scanline;
-				color.rgb *= vec3(1.0, 0.9, 0.8); // Slight tint
-				gl_FragColor = color;
-			}
-		`
-	};
+	$: {
+		if (shaderIndex < 0) shaderIndex = shaders.length - 1;
+		if (shaderIndex >= shaders.length) shaderIndex = 0;
+	}
+
+	$: shader = shaders[shaderIndex];
+
+	function setShader(shader: Shader): void {
+		if (!material) return;
+
+		material.fragmentShader = shader.fragmentShader;
+		material.vertexShader = shader.vertexShader;
+		material.uniforms = Object.assign(material.uniforms, UniformsUtils.clone(shader.uniforms));
+		material.needsUpdate = true;
+	}
+
+	$: {
+		console.log("Shader:", shader);
+
+		setShader(shader);
+	}
+
+	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
+		stepper.onAxesStateChange(axes);
+	}
+
+	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
+		stepper.onButtonStateChange(buttonIndex, isPressed);
+
+		if (buttonIndex == SwitchPro.LT) {
+			if (!isPressed) return;
+
+			shaderIndex--;
+		} else if (buttonIndex == SwitchPro.RT) {
+			if (!isPressed) return;
+
+			shaderIndex++;
+		}
+	}
+
+	function handleParamsChanged(p0: number, p1: number, p2: number, p3: number) {
+		if (!material) return;
+
+		material.uniforms.p0.value = p0;
+		material.uniforms.p1.value = p1;
+		material.uniforms.p2.value = p2;
+		material.uniforms.p3.value = p3;
+	}
 
 	onMount(async () => {
-		if (!container) return;
-
 		renderer = new THREE.WebGLRenderer({ alpha: true });
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.setPixelRatio(window.devicePixelRatio);
@@ -57,10 +83,11 @@
 		texture.magFilter = THREE.LinearFilter;
 
 		material = new THREE.ShaderMaterial({
-			uniforms: { tDiffuse: { value: texture }, time: { value: 0 } },
-			vertexShader: crtShader.vertexShader,
-			fragmentShader: crtShader.fragmentShader
+			uniforms: UniformsUtils.clone(shader.uniforms),
+			vertexShader: shader.vertexShader,
+			fragmentShader: shader.fragmentShader
 		});
+		material.uniforms.tDiffuse.value = texture;
 
 		const mesh = new THREE.Mesh(geometry, material);
 		scene.add(mesh);
@@ -79,13 +106,11 @@
 		});
 	});
 
-	// Watch for videoElement updates
 	$: if (videoElement && texture) {
 		texture.image = videoElement;
 		texture.needsUpdate = true;
 		if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0 && renderer) {
 			const aspectRatio = window.innerWidth / window.innerHeight;
-
 			renderer.setSize(window.innerWidth, window.innerHeight);
 			camera.aspect = aspectRatio;
 			camera.updateProjectionMatrix();
@@ -102,17 +127,4 @@
 	});
 </script>
 
-<style>
-    .crt-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-        z-index: 1;
-        pointer-events: none;
-    }
-</style>
-
-<div bind:this={container} class="crt-container"></div>
+<Stepper bind:this={stepper} onParamsChange={handleParamsChanged} p0={shader.uniforms.p0.value} p1={shader.uniforms.p1.value} p2={shader.uniforms.p2.value} p3={shader.uniforms.p3.value} />

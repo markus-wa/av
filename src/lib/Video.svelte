@@ -10,6 +10,7 @@
 	}
 
 	export let videoElement: HTMLVideoElement | null = null;
+	export let imgElement: HTMLImageElement | null = null;
 	let devices: MediaDeviceInfo[] = [];
 	let devicesIds: string[] = ['screen'];
 	let deviceIndex: number = 0;
@@ -21,6 +22,7 @@
 
 	$: playlist = playlists && playlists[playlistIndex];
 	$: media = playlist && playlist.entries[mediaIndex];
+	$: isVideo = (mode === 0 || mode === 1 || media && media.url.endsWith('.mp4'));
 
 	async function getCameras(): Promise<void> {
 		await navigator.mediaDevices.getUserMedia({video: true});
@@ -199,20 +201,26 @@
 		});
 	}
 	async function playMedia(url: string) {
-		if (!videoElement) return;
+		if (isVideo) {
+			if (!videoElement) return;
 
-		videoElement.srcObject = null;
-		videoElement.src = url;
+			videoElement.srcObject = null;
+			videoElement.src = url;
 
-		videoElement.onended = () => {
-			mediaIndex++;
-		};
+			videoElement.onended = () => {
+				mediaIndex++;
+			};
 
-		await videoElement.play();
+			await videoElement.play();
+		} else {
+			if (!imgElement) return;
+
+			imgElement.src = url;
+		}
 	}
 
 	async function loadPlaylists() {
-		const resp = await fetch('/playlists.json');
+		const resp = await fetch('/api/playlists');
 		playlists = await resp.json();
 	}
 
@@ -238,6 +246,17 @@
 				cursor: none;
 				background: black;
     }
+		img {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100vw;
+			height: 100vh;
+			object-fit: cover;
+			z-index: -1;
+			cursor: none;
+		}
 </style>
 
-<video autoplay muted bind:this={videoElement} loop={loop || null} />
+<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loop || null} />
+<img class:invisible={isVideo} bind:this={imgElement} />
