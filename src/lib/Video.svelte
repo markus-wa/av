@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onDestroy, onMount } from 'svelte';
 	import Hls from 'hls.js';
 	import { toast } from 'svelte-french-toast';
 	import SwitchPro from '$lib/Controllers';
+	import Stepper from '$lib/Stepper.svelte';
 
 	interface Playlist {
 		name: string;
@@ -18,15 +19,35 @@
 	let playlists: Playlist[];
 	let playlistIndex: number = 0;
 	let mode = 2;
-	let loop = true;
+	let loopVideos = false;
+	let shuffle = false;
+	let cutVideo = false;
+	let nextMediaIntervalSec = 5;
+	let nextMediaInterval: ReturnType<typeof setInterval>;
+
+	// Shuffle-related state
+	let shuffleOrder: number[] = [];
+	let currentShuffleIndex: number = 0;
+
+	// Update the nextMedia timer when the interval changes
+	$: {
+		if (nextMediaInterval) {
+			clearInterval(nextMediaInterval);
+		}
+		nextMediaInterval = setInterval(nextMedia, nextMediaIntervalSec * 1000);
+	}
+
+	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
+	function handleParamsChange(newNextMediaIntervalSec: number): void {
+		nextMediaIntervalSec = 1 + Math.floor(newNextMediaIntervalSec * 9);
+	}
 
 	$: playlist = playlists && playlists[playlistIndex];
 	$: media = playlist && playlist.entries[mediaIndex];
-	$: isVideo = (mode === 0 || mode === 1 || media && media.url.endsWith('.mp4'));
+	$: isVideo = (mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4')));
 
 	async function getCameras(): Promise<void> {
-		await navigator.mediaDevices.getUserMedia({video: true});
-
+		await navigator.mediaDevices.getUserMedia({ video: true });
 		console.log("Getting cameras...");
 		const mediaDevices = await navigator.mediaDevices.enumerateDevices();
 		devices = mediaDevices.filter((device) => device.kind === "videoinput");
@@ -34,10 +55,10 @@
 			...devices.map((device) => device.deviceId),
 			'screen',
 		];
-
 		console.log(mediaDevices);
 	}
 
+	// Ensure indices stay within range. For mediaIndex we skip auto‑correction in shuffle mode.
 	$: {
 		if (mode === 0) {
 			if (deviceIndex >= devicesIds.length) {
@@ -46,10 +67,12 @@
 				deviceIndex = devicesIds.length - 1;
 			}
 		} else if (mode === 2 && playlist) {
-			if (mediaIndex >= playlist.entries.length) {
-				mediaIndex = 0;
-			} else if (mediaIndex < 0) {
-				mediaIndex = playlist.entries.length - 1;
+			if (!shuffle) {
+				if (mediaIndex >= playlist.entries.length) {
+					mediaIndex = 0;
+				} else if (mediaIndex < 0) {
+					mediaIndex = playlist.entries.length - 1;
+				}
 			}
 		}
 	}
@@ -67,7 +90,15 @@
 	$: selectedDeviceId = devicesIds[deviceIndex];
 
 	$: {
-		toast(`Loop: ${loop ? 'ON' : 'OFF'}`);
+		toast(`Loop: ${loopVideos ? 'ON' : 'OFF'}`);
+	}
+
+	$: {
+		toast(`Cut: ${cutVideo ? 'ON' : 'OFF'}`);
+	}
+
+	$: {
+		toast(`Shuffle: ${shuffle ? 'ON' : 'OFF'}`);
 	}
 
 	$: {
@@ -98,10 +129,27 @@
 		}
 	}
 
+	// Generate a shuffled order using the Fisher–Yates algorithm
+	function generateShuffleOrder(length: number): number[] {
+		const order = Array.from({ length }, (_, i) => i);
+		for (let i = order.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[order[i], order[j]] = [order[j], order[i]];
+		}
+		return order;
+	}
+
+	// Ensure the shuffle order is up-to-date when in shuffle mode
+	$: if (mode === 2 && playlist && shuffle) {
+		if (shuffleOrder.length !== playlist.entries.length || shuffleOrder.indexOf(mediaIndex) === -1) {
+			shuffleOrder = generateShuffleOrder(playlist.entries.length);
+			currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
+		}
+	}
+
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
 		if (buttonIndex == SwitchPro.SELECT) {
 			if (!isPressed) return;
-
 			if (mode === 2) {
 				mode = 0;
 			} else {
@@ -109,7 +157,6 @@
 			}
 		} else if (buttonIndex == SwitchPro.START) {
 			if (!isPressed) return;
-
 			if (mode === 0) {
 				mode = 2;
 			} else {
@@ -117,56 +164,64 @@
 			}
 		} else if (buttonIndex == SwitchPro.LT) {
 			if (!isPressed) return;
-
 			if (mode === 0) {
 				deviceIndex--;
 			} else if (mode === 2) {
-				mediaIndex--;
+				if (shuffle) {
+					prevShuffleMedia();
+				} else {
+					mediaIndex--;
+				}
 			}
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
-
 			if (mode === 0) {
 				deviceIndex++;
 			} else if (mode === 2) {
-				mediaIndex++;
+				if (shuffle) {
+					nextShuffleMedia();
+				} else {
+					mediaIndex++;
+				}
 			}
-		}else if (buttonIndex == SwitchPro.LT2) {
+		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
-
-			 if (mode === 2) {
-				 playlistIndex--;
+			if (mode === 2) {
+				playlistIndex--;
 			}
 		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
-
-			 if (mode === 2) {
+			if (mode === 2) {
 				playlistIndex++;
 			}
 		} else if (buttonIndex == SwitchPro.HOME) {
 			if (!isPressed) return;
-
 			reload();
 		} else if (buttonIndex == SwitchPro.D_LEFT) {
 			if (!isPressed) return;
-
-			loop = !loop;
+			loopVideos = !loopVideos;
+		} else if (buttonIndex == SwitchPro.D_UP) {
+			if (!isPressed) return;
+			shuffle = !shuffle;
+			if (shuffle && playlist) {
+				shuffleOrder = generateShuffleOrder(playlist.entries.length);
+				currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
+			}
+		} else if (buttonIndex == SwitchPro.D_RIGHT) {
+			if (!isPressed) return;
+			cutVideo = !cutVideo;
 		}
 	}
 
-	export function onAxesStateChange(): void {
-	}
+	export function onAxesStateChange(): void {}
 
 	async function startCamera(deviceId: string): Promise<void> {
 		const label = devices.find((device) => device.deviceId === deviceId)?.label;
 		toast(`Starting camera: ${label}`);
-
 		if (!deviceId) return;
-
 		const stream = await navigator.mediaDevices.getUserMedia({
 			video: { deviceId: { exact: deviceId } },
 		});
-
 		if (videoElement) {
 			videoElement.srcObject = stream;
 		}
@@ -177,11 +232,9 @@
 			const stream = await navigator.mediaDevices.getDisplayMedia({
 				video: true
 			});
-
 			if (videoElement) {
 				videoElement.srcObject = stream;
 			}
-
 			toast("Started screen capture");
 		} catch {
 			toast("Failed to start screen capture");
@@ -190,9 +243,7 @@
 
 	function startHLS() {
 		if (!videoElement) return;
-
 		videoElement.srcObject = null;
-
 		const hls = new Hls();
 		hls.loadSource('http://fl1.moveonjoy.com/NICKELODEON/index.m3u8');
 		hls.attachMedia(videoElement);
@@ -200,28 +251,67 @@
 			videoElement!.play();
 		});
 	}
+
 	async function playMedia(url: string) {
 		if (isVideo) {
 			if (!videoElement) return;
-
 			videoElement.srcObject = null;
 			videoElement.src = url;
-
 			videoElement.onended = () => {
-				mediaIndex++;
+				if (shuffle) {
+					nextShuffleMedia();
+				} else {
+					mediaIndex++;
+				}
 			};
-
 			await videoElement.play();
 		} else {
 			if (!imgElement) return;
-
 			imgElement.src = url;
+		}
+	}
+
+	async function preloadMedia(url: string): Promise<void> {
+		try {
+			const response = await fetch(url);
+			if (!response.ok) {
+				console.error(`Failed to preload media: ${url}`);
+			}
+		} catch (error) {
+			console.error(`Error preloading media: ${url}`, error);
 		}
 	}
 
 	async function loadPlaylists() {
 		const resp = await fetch('/api/playlists');
 		playlists = await resp.json();
+		for (const playlist of playlists) {
+			if (playlist.entries.length > 0) {
+				await preloadMedia(playlist.entries[0].url);
+			}
+		}
+	}
+
+	$: {
+		if (mode === 2 && playlist) {
+			const nextIndex = (mediaIndex + 1) % playlist.entries.length;
+			const prevIndex = (mediaIndex - 1 + playlist.entries.length) % playlist.entries.length;
+			// Preload next and previous media
+			preloadMedia(playlist.entries[nextIndex].url);
+			preloadMedia(playlist.entries[prevIndex].url);
+		}
+	}
+
+	function nextShuffleMedia() {
+		if (!playlist) return;
+		currentShuffleIndex = (currentShuffleIndex + 1) % shuffleOrder.length;
+		mediaIndex = shuffleOrder[currentShuffleIndex];
+	}
+
+	function prevShuffleMedia() {
+		if (!playlist) return;
+		currentShuffleIndex = (currentShuffleIndex - 1 + shuffleOrder.length) % shuffleOrder.length;
+		mediaIndex = shuffleOrder[currentShuffleIndex];
 	}
 
 	function reload() {
@@ -229,8 +319,21 @@
 		loadPlaylists();
 	}
 
+	function nextMedia() {
+		if (mode === 2 && (!isVideo || cutVideo)) {
+			if (shuffle) {
+				nextShuffleMedia();
+			} else {
+				mediaIndex++;
+			}
+		}
+	}
+
 	onMount(() => {
 		reload();
+	});
+	onDestroy(() => {
+		clearInterval(nextMediaInterval);
 	});
 </script>
 
@@ -243,20 +346,21 @@
         height: 100vh;
         object-fit: cover;
         z-index: -1;
-				cursor: none;
-				background: black;
+        cursor: none;
+        background: black;
     }
-		img {
-			position: fixed;
-			top: 0;
-			left: 0;
-			width: 100vw;
-			height: 100vh;
-			object-fit: cover;
-			z-index: -1;
-			cursor: none;
-		}
+    img {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        z-index: -1;
+        cursor: none;
+    }
 </style>
 
-<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loop || null} />
+<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null} />
 <img class:invisible={isVideo} bind:this={imgElement} />
+<Stepper onParamsChange={handleParamsChange} />

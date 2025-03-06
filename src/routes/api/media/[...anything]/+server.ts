@@ -1,4 +1,3 @@
-// src/routes/api/media/[...url]/+server.ts
 import { MEDIA_DIR } from '$env/static/private';
 import fs from 'fs/promises';
 import path from 'path';
@@ -6,8 +5,6 @@ import { lookup } from 'mime-types';
 import type { RequestHandler } from '@sveltejs/kit';
 
 export const GET: RequestHandler = async ({ url }) => {
-	console.log(url);
-
 	const urlPath = url.pathname?.replace(/^\/api\/media\//, '');
 
 	if (!urlPath) {
@@ -32,7 +29,10 @@ export const GET: RequestHandler = async ({ url }) => {
 		const contentType = lookup(resolvedFilePath) || 'application/octet-stream';
 
 		return new Response(fileData, {
-			headers: { 'Content-Type': contentType.toString() }
+			headers: {
+				'Content-Type': contentType.toString(),
+				'Cache-Control': 'public, max-age=31536000, immutable'
+			}
 		});
 	} catch (error) {
 		console.error(error);

@@ -9,6 +9,7 @@ export default defineConfig({
 		sveltekit(),
 	],
 	server: {
+		open: true,
 		https: {
 			key: fs.readFileSync('localhost+1-key.pem'),
 			cert: fs.readFileSync('localhost+1.pem')
