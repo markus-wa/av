@@ -31,6 +31,7 @@
 		material.fragmentShader = shader.fragmentShader;
 		material.vertexShader = shader.vertexShader;
 		material.uniforms = Object.assign(material.uniforms, UniformsUtils.clone(shader.uniforms));
+		material.uniforms.tDiffuse.value = texture;
 		material.needsUpdate = true;
 	}
 
