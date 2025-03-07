@@ -17,13 +17,14 @@
 	let deviceIndex: number = 0;
 	let mediaIndex: number = 0;
 	let playlists: Playlist[];
-	let playlistIndex: number = 0;
-	let mode = 2;
+	let playlistIndex: number = 1;
+	let mode = 0;
 	let loopVideos = false;
 	let shuffle = false;
 	let cutVideo = false;
 	let nextMediaIntervalSec = 5;
 	let nextMediaInterval: ReturnType<typeof setInterval>;
+	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
 	// Shuffle-related state
 	let shuffleOrder: number[] = [];
@@ -45,6 +46,12 @@
 	$: playlist = playlists && playlists[playlistIndex];
 	$: media = playlist && playlist.entries[mediaIndex];
 	$: isVideo = (mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4')));
+
+	$: {
+		if (onMediaChange && (isVideo && videoElement) || (!isVideo && imgElement)) {
+			onMediaChange(isVideo ? videoElement! : imgElement!);
+		}
+	}
 
 	async function getCameras(): Promise<void> {
 		await navigator.mediaDevices.getUserMedia({ video: true });

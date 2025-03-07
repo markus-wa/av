@@ -16,6 +16,12 @@
 	let shiftPressed: boolean = false;
 	let controlledComponentIndex: number = 0;
 	let controlledComponents: ControlledComponent[];
+	let mediaElement: HTMLVideoElement | HTMLImageElement;
+
+	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
+		console.log("Media changed:", element);
+		mediaElement = element;
+	}
 
 	interface ControlledComponent {
 		onAxesStateChange(axesState: ReadonlyArray<number>): void;
@@ -116,6 +122,6 @@
 </script>
 
 <MIDI bind:this={midiComponent} />
-<Video bind:this={videoComponent} />
-<Shader bind:this={shaderComponent} videoElement={videoComponent?.videoElement}/>
+<Video bind:this={videoComponent} onMediaChange={handleMediaChange}/>
+<Shader bind:this={shaderComponent} mediaElement={mediaElement}/>
 <Toaster />

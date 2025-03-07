@@ -2,11 +2,11 @@
 	import { onMount, onDestroy } from 'svelte';
 	import * as THREE from "three";
 	import Stepper from '$lib/Stepper.svelte';
-	import { ColorGrading, CRT, type Shader } from '$lib/Shaders';
+	import { ChromaticAberration, ColorGrading, CRT, EdgeDetection, Pixelation, type Shader } from '$lib/Shaders';
 	import SwitchPro from '$lib/Controllers';
 	import { UniformsUtils } from 'three';
 
-	export let videoElement: HTMLVideoElement | null = null;
+	export let mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
 
 	let renderer: THREE.WebGLRenderer | null = null;
 	let scene: THREE.Scene;
@@ -15,7 +15,7 @@
 	let animationFrameId: number;
 	let texture: THREE.Texture | null = null;
 	let stepper: Stepper;
-	const shaders: Shader[] = [CRT, ColorGrading];
+	const shaders: Shader[] = [CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
 	let shaderIndex = 0;
 
 	$: {
@@ -75,10 +75,18 @@
 
 		scene = new THREE.Scene();
 		camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-		camera.position.z = 1;
+		camera.position.z = 10; // Adjust the camera position as needed
 
 		const geometry = new THREE.PlaneGeometry(16, 9);
-		texture = videoElement ? new THREE.VideoTexture(videoElement) : new THREE.Texture();
+		if (mediaElement) {
+			if (mediaElement instanceof HTMLVideoElement) {
+				texture = new THREE.VideoTexture(mediaElement);
+			} else {
+				texture = new THREE.Texture(mediaElement);
+			}
+		} else {
+			texture = new THREE.Texture();
+		}
 		texture.minFilter = THREE.LinearFilter;
 		texture.magFilter = THREE.LinearFilter;
 
@@ -106,14 +114,30 @@
 		});
 	});
 
-	$: if (videoElement && texture) {
-		texture.image = videoElement;
-		texture.needsUpdate = true;
-		if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0 && renderer) {
-			const aspectRatio = window.innerWidth / window.innerHeight;
-			renderer.setSize(window.innerWidth, window.innerHeight);
-			camera.aspect = aspectRatio;
-			camera.updateProjectionMatrix();
+	$: if (mediaElement) {
+		if (mediaElement instanceof HTMLVideoElement) {
+			texture = new THREE.VideoTexture(mediaElement);
+			texture.minFilter = THREE.LinearFilter;
+			texture.magFilter = THREE.LinearFilter;
+			material.uniforms.tDiffuse.value = texture;
+			material.needsUpdate = true;
+		} else if (mediaElement instanceof HTMLImageElement) {
+			console.log(mediaElement.src);
+			if (mediaElement.src.endsWith('.gif')) {
+				texture = new THREE.Texture();
+				material.uniforms.tDiffuse.value = texture;
+				material.needsUpdate = true;
+			} else {
+				mediaElement.onload = () => {
+					texture = new THREE.Texture(mediaElement);
+					texture.needsUpdate = true;
+					texture.minFilter = THREE.LinearFilter;
+					texture.magFilter = THREE.LinearFilter;
+					texture.generateMipmaps = false; // Avoid generating mipmaps for non-power-of-two textures
+					material.uniforms.tDiffuse.value = texture;
+					material.needsUpdate = true;
+				};
+			}
 		}
 	}
 
