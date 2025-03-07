@@ -353,7 +353,6 @@
         height: 100vh;
         object-fit: cover;
         z-index: -1;
-        cursor: none;
         background: black;
     }
     img {
@@ -364,7 +363,6 @@
         height: 100vh;
         object-fit: cover;
         z-index: -1;
-        cursor: none;
     }
 </style>
 
