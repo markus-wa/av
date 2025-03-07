@@ -4,6 +4,7 @@
 	import MIDI from '$lib/MIDI.svelte';
 	import { toast, Toaster } from 'svelte-french-toast';
 	import Shader from '$lib/Shader.svelte';
+	import SwitchPro from '$lib/Controllers';
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
@@ -17,6 +18,8 @@
 	let controlledComponentIndex: number = 0;
 	let controlledComponents: ControlledComponent[];
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
+	let showToaster: boolean = false;
+	let rStickPressStart: number | null = null;
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log("Media changed:", element);
@@ -68,17 +71,24 @@
 
 					let handled = false;
 
-					if (index === 17) {
+					if (index === SwitchPro.SCREENSHOT) {
 						shiftPressed = pressed;
 					} else if (shiftPressed) {
-						if (index === 16 && pressed) {
+						if (index === SwitchPro.HOME && pressed) {
 							if (controlledComponentIndex === controlledComponents.length - 1) {
 								controlledComponentIndex = 0;
 							} else {
 								controlledComponentIndex++;
 							}
-
 							handled = true;
+						}
+					}
+
+					if (index === SwitchPro.RIGHT_STICK) {
+						if (pressed) {
+							rStickPressStart = performance.now();
+						} else {
+							rStickPressStart = null;
 						}
 					}
 
@@ -87,6 +97,11 @@
 					}
 				}
 			});
+
+			if (rStickPressStart !== null && performance.now() - rStickPressStart >= 3000) {
+				showToaster = !showToaster;
+				rStickPressStart = null;
+			}
 
 			previousButtonStates = buttons.map(button => button.pressed);
 			if (axesState !== gamepad.axes) {
@@ -124,4 +139,6 @@
 <MIDI bind:this={midiComponent} />
 <Video bind:this={videoComponent} onMediaChange={handleMediaChange}/>
 <Shader bind:this={shaderComponent} mediaElement={mediaElement}/>
-<Toaster />
+{#if showToaster}
+	<Toaster />
+{/if}
