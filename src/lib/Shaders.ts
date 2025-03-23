@@ -244,15 +244,23 @@ export const WaveformRipple = {
 				float normalizedValue = clamp((dbValue + 140.0) / 140.0, 0.0, 1.0);
 				intensity += normalizedValue;
 			}
-			intensity /= 2.0;
+			intensity /= 8.0;
 
-			// Create rippling effect
-			float ripple = sin(dist * 20.0 - time * 2.0) * intensity * 0.1;
+			// Apply non-linear response to intensity
+			// Using power function to make it less sensitive at low volumes
+			// but more dramatic at high volumes
+			float threshold = 0.05; // Lower threshold for earlier effect
+			float power = 1.5;    // Less aggressive power for more linear response
+			float scaledIntensity = max(0.0, (intensity - threshold) / (1.0 - threshold));
+			float nonLinearIntensity = pow(scaledIntensity, power);
+
+			// Create rippling effect with non-linear intensity
+			float ripple = sin(dist * 20.0 - time * 2.0) * nonLinearIntensity * 0.8; // Increased ripple intensity
 			vec2 distortedUV = uv + vec2(ripple, ripple);
 
-			// Mix original color with distorted version
+			// Mix original color with distorted version using non-linear intensity
 			vec4 distortedColor = texture2D(tDiffuse, distortedUV);
-			color = mix(color, distortedColor, intensity * 0.5);
+			color = mix(color, distortedColor, nonLinearIntensity); // Increased color mix intensity
 
 			gl_FragColor = color;
 		}
