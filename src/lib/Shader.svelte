@@ -3,12 +3,12 @@
 	import * as THREE from "three";
 	import Stepper from '$lib/Stepper.svelte';
 	import {
-		AudioReactive,
 		ChromaticAberration,
 		ColorGrading,
 		CRT,
 		EdgeDetection,
 		Pixelation,
+		WaveformRipple,
 		type Shader
 	} from '$lib/Shaders';
 	import SwitchPro from '$lib/Controllers';
@@ -23,7 +23,7 @@
 	let animationFrameId: number;
 	let texture: THREE.Texture | null = null;
 	let stepper: Stepper;
-	const shaders: Shader[] = [AudioReactive, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
+	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
 	let shaderIndex = 0;
 	let audioContext: AudioContext;
 	let analyser: AnalyserNode;
@@ -112,8 +112,30 @@
 		document.body.appendChild(renderer.domElement);
 
 		scene = new THREE.Scene();
-		camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-		camera.position.z = 10; // Adjust the camera position as needed
+		
+		// Calculate the appropriate field of view to make the content fill the window
+		const windowAspect = window.innerWidth / window.innerHeight;
+		const contentAspect = 16/9;
+		let fov = 45;
+		
+		if (windowAspect > contentAspect) {
+			// Window is wider than content - adjust horizontal FOV
+			fov = 2 * Math.atan(Math.tan(45 * Math.PI / 360) * (windowAspect / contentAspect)) * 360 / Math.PI;
+		} else {
+			// Window is taller than content - adjust vertical FOV
+			fov = 2 * Math.atan(Math.tan(45 * Math.PI / 360) * (contentAspect / windowAspect)) * 360 / Math.PI;
+		}
+		
+		camera = new THREE.PerspectiveCamera(fov, windowAspect, 0.1, 1000);
+		
+		// Calculate the exact zoom factor needed based on aspect ratios
+		const zoomFactor = windowAspect > contentAspect 
+			? windowAspect / contentAspect  // Window is wider - zoom based on width ratio
+			: contentAspect / windowAspect; // Window is taller - zoom based on height ratio
+		
+		// Apply the zoom factor to the camera distance
+		const distance = Math.abs(9 / (2 * Math.tan(fov * Math.PI / 360))) / zoomFactor;
+		camera.position.z = distance;
 
 		const geometry = new THREE.PlaneGeometry(16, 9);
 		if (mediaElement) {
@@ -146,7 +168,29 @@
 
 		window.addEventListener('resize', () => {
 			renderer!.setSize(window.innerWidth, window.innerHeight);
-			camera.aspect = window.innerWidth / window.innerHeight;
+			
+			// Recalculate FOV on resize
+			const windowAspect = window.innerWidth / window.innerHeight;
+			const contentAspect = 16/9;
+			let fov = 45;
+			
+			if (windowAspect > contentAspect) {
+				fov = 2 * Math.atan(Math.tan(45 * Math.PI / 360) * (windowAspect / contentAspect)) * 360 / Math.PI;
+			} else {
+				fov = 2 * Math.atan(Math.tan(45 * Math.PI / 360) * (contentAspect / windowAspect)) * 360 / Math.PI;
+			}
+			
+			camera.fov = fov;
+			camera.aspect = windowAspect;
+			
+			// Recalculate zoom factor and camera distance on resize
+			const zoomFactor = windowAspect > contentAspect 
+				? windowAspect / contentAspect
+				: contentAspect / windowAspect;
+			
+			const distance = Math.abs(9 / (2 * Math.tan(fov * Math.PI / 360))) / zoomFactor;
+			camera.position.z = distance;
+			
 			camera.updateProjectionMatrix();
 		});
 	});

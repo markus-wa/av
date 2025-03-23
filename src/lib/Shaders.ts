@@ -207,44 +207,54 @@ export const EdgeDetection = {
     }
   `
 };
-export const AudioReactive = {
+
+export const WaveformRipple = {
 	uniforms: {
 		tDiffuse: { value: null },
-		audioData: { value: new Float32Array(512) }
+		audioData: { value: new Float32Array(512) },
+		time: { value: 0.0 }
 	},
 	vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
+		varying vec2 vUv;
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`,
 	fragmentShader: `
-    varying vec2 vUv;
-    uniform sampler2D tDiffuse;
-    uniform float audioData[512];
+		varying vec2 vUv;
+		uniform sampler2D tDiffuse;
+		uniform float audioData[512];
+		uniform float time;
 
-    void main() {
-      vec2 uv = vUv;
-      vec4 color = texture2D(tDiffuse, uv);
+		void main() {
+			vec2 uv = vUv;
+			vec4 color = texture2D(tDiffuse, uv);
 
-      float chartHeight = 0.25;
+			// Create ripples based on audio intensity
+			float centerX = 0.5;
+			float centerY = 0.5;
+			float dist = distance(uv, vec2(centerX, centerY));
 
-      int binIndex = int(floor(uv.x * 512.0));
-      binIndex = clamp(binIndex, 0, 511);
+			// Get audio intensity from multiple frequency bands
+			float intensity = 0.0;
+			for(int i = 0; i < 8; i++) {
+				int binIndex = int(floor(float(i) * 64.0));
+				float dbValue = audioData[binIndex];
+				float normalizedValue = clamp((dbValue + 140.0) / 140.0, 0.0, 1.0);
+				intensity += normalizedValue;
+			}
+			intensity /= 2.0;
 
-      float dbValue = audioData[binIndex];
-      float normalizedValue = clamp((dbValue + 140.0) / 140.0, 0.0, 1.0);
+			// Create rippling effect
+			float ripple = sin(dist * 20.0 - time * 2.0) * intensity * 0.1;
+			vec2 distortedUV = uv + vec2(ripple, ripple);
 
-      float barHeight = normalizedValue * chartHeight;
+			// Mix original color with distorted version
+			vec4 distortedColor = texture2D(tDiffuse, distortedUV);
+			color = mix(color, distortedColor, intensity * 0.5);
 
-      if (uv.y < barHeight) {
-        color = vec4(vec3(0.5, 0.5, 0.5), 1.0);
-      } else if (uv.y < chartHeight) {
-        color = mix(color, vec4(0.0, 0.0, 0.0, 1.0), 0.5);
-      }
-
-      gl_FragColor = color;
-    }
-  `
+			gl_FragColor = color;
+		}
+	`
 };
