@@ -2,7 +2,15 @@
 	import { onMount, onDestroy } from 'svelte';
 	import * as THREE from "three";
 	import Stepper from '$lib/Stepper.svelte';
-	import { ChromaticAberration, ColorGrading, CRT, EdgeDetection, Pixelation, type Shader } from '$lib/Shaders';
+	import {
+		AudioReactive,
+		ChromaticAberration,
+		ColorGrading,
+		CRT,
+		EdgeDetection,
+		Pixelation,
+		type Shader
+	} from '$lib/Shaders';
 	import SwitchPro from '$lib/Controllers';
 	import { UniformsUtils } from 'three';
 
@@ -15,8 +23,12 @@
 	let animationFrameId: number;
 	let texture: THREE.Texture | null = null;
 	let stepper: Stepper;
-	const shaders: Shader[] = [CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
+	const shaders: Shader[] = [AudioReactive, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
 	let shaderIndex = 0;
+	let audioContext: AudioContext;
+	let analyser: AnalyserNode;
+	let audioData: Float32Array;
+	let lastTime: number = performance.now();
 
 	$: {
 		if (shaderIndex < 0) shaderIndex = shaders.length - 1;
@@ -62,13 +74,38 @@
 	function handleParamsChanged(p0: number, p1: number, p2: number, p3: number) {
 		if (!material) return;
 
-		material.uniforms.p0.value = p0;
-		material.uniforms.p1.value = p1;
-		material.uniforms.p2.value = p2;
-		material.uniforms.p3.value = p3;
+		if (material.uniforms.p0)	material.uniforms.p0.value = p0;
+		if (material.uniforms.p1)	material.uniforms.p1.value = p1;
+		if (material.uniforms.p2)	material.uniforms.p2.value = p2;
+		if (material.uniforms.p3)	material.uniforms.p3.value = p3;
+	}
+
+	async function initAudio() {
+		audioContext = new AudioContext();
+		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+		const source = audioContext.createMediaStreamSource(stream);
+		analyser = audioContext.createAnalyser();
+		analyser.fftSize = 1024;
+		source.connect(analyser);
+		audioData = new Float32Array(analyser.frequencyBinCount);
+	}
+
+	function animate() {
+		if (material.uniforms.audioData) {
+			analyser.getFloatFrequencyData(audioData);
+			material.uniforms.audioData.value = audioData;
+		}
+		if (material.uniforms.time) {
+			material.uniforms.time.value += lastTime - performance.now();
+			lastTime = performance.now();
+		}
+		renderer!.render(scene, camera);
+		animationFrameId = requestAnimationFrame(animate);
 	}
 
 	onMount(async () => {
+		await initAudio();
+
 		renderer = new THREE.WebGLRenderer({ alpha: true });
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.setPixelRatio(window.devicePixelRatio);
@@ -92,7 +129,10 @@
 		texture.magFilter = THREE.LinearFilter;
 
 		material = new THREE.ShaderMaterial({
-			uniforms: UniformsUtils.clone(shader.uniforms),
+			uniforms: {
+				...UniformsUtils.clone(shader.uniforms),
+				audioData: { value: audioData }
+			},
 			vertexShader: shader.vertexShader,
 			fragmentShader: shader.fragmentShader
 		});
@@ -101,12 +141,8 @@
 		const mesh = new THREE.Mesh(geometry, material);
 		scene.add(mesh);
 
-		function animate() {
-			animationFrameId = requestAnimationFrame(animate);
-			material.uniforms.time.value += 0.02;
-			renderer!.render(scene, camera);
-		}
 		animate();
+		console.log(audioData);
 
 		window.addEventListener('resize', () => {
 			renderer!.setSize(window.innerWidth, window.innerHeight);
@@ -115,31 +151,33 @@
 		});
 	});
 
-	$: if (mediaElement) {
-		if (mediaElement instanceof HTMLVideoElement) {
-			texture = new THREE.VideoTexture(mediaElement);
-			texture.minFilter = THREE.LinearFilter;
-			texture.magFilter = THREE.LinearFilter;
-			material.uniforms.tDiffuse.value = texture;
-			material.needsUpdate = true;
-		} else if (mediaElement instanceof HTMLImageElement) {
-			console.log(mediaElement.src);
-			if (mediaElement.src.endsWith('.gif')) {
-				texture = new THREE.Texture();
+	$: materialInitialized = material !== undefined;
+
+	$: if (mediaElement && materialInitialized) {
+			if (mediaElement instanceof HTMLVideoElement) {
+				texture = new THREE.VideoTexture(mediaElement);
+				texture.minFilter = THREE.LinearFilter;
+				texture.magFilter = THREE.LinearFilter;
 				material.uniforms.tDiffuse.value = texture;
 				material.needsUpdate = true;
-			} else {
-				mediaElement.onload = () => {
-					texture = new THREE.Texture(mediaElement);
-					texture.needsUpdate = true;
-					texture.minFilter = THREE.LinearFilter;
-					texture.magFilter = THREE.LinearFilter;
-					texture.generateMipmaps = false; // Avoid generating mipmaps for non-power-of-two textures
+			} else if (mediaElement instanceof HTMLImageElement) {
+				console.log(mediaElement.src);
+				if (mediaElement.src.endsWith('.gif')) {
+					texture = new THREE.Texture();
 					material.uniforms.tDiffuse.value = texture;
 					material.needsUpdate = true;
-				};
+				} else {
+					mediaElement.onload = () => {
+						texture = new THREE.Texture(mediaElement);
+						texture.needsUpdate = true;
+						texture.minFilter = THREE.LinearFilter;
+						texture.magFilter = THREE.LinearFilter;
+						texture.generateMipmaps = false; // Avoid generating mipmaps for non-power-of-two textures
+						material.uniforms.tDiffuse.value = texture;
+						material.needsUpdate = true;
+					};
+				}
 			}
-		}
 	}
 
 	onDestroy(() => {
@@ -149,7 +187,10 @@
 		if (renderer) {
 			renderer.dispose();
 		}
+		if (audioContext) {
+			audioContext.close();
+		}
 	});
 </script>
 
-<Stepper bind:this={stepper} onParamsChange={handleParamsChanged} p0={shader.uniforms.p0.value} p1={shader.uniforms.p1.value} p2={shader.uniforms.p2.value} p3={shader.uniforms.p3.value} />
+<Stepper bind:this={stepper} onParamsChange={handleParamsChanged} p0={shader.uniforms.p0?.value || 0.5} p1={shader.uniforms.p1?.value || 0.5} p2={shader.uniforms.p2?.value || 0.5} p3={shader.uniforms.p3?.value || 0.5} />

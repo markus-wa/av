@@ -207,3 +207,44 @@ export const EdgeDetection = {
     }
   `
 };
+export const AudioReactive = {
+	uniforms: {
+		tDiffuse: { value: null },
+		audioData: { value: new Float32Array(512) }
+	},
+	vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+	fragmentShader: `
+    varying vec2 vUv;
+    uniform sampler2D tDiffuse;
+    uniform float audioData[512];
+
+    void main() {
+      vec2 uv = vUv;
+      vec4 color = texture2D(tDiffuse, uv);
+
+      float chartHeight = 0.25;
+
+      int binIndex = int(floor(uv.x * 512.0));
+      binIndex = clamp(binIndex, 0, 511);
+
+      float dbValue = audioData[binIndex];
+      float normalizedValue = clamp((dbValue + 140.0) / 140.0, 0.0, 1.0);
+
+      float barHeight = normalizedValue * chartHeight;
+
+      if (uv.y < barHeight) {
+        color = vec4(vec3(0.5, 0.5, 0.5), 1.0);
+      } else if (uv.y < chartHeight) {
+        color = mix(color, vec4(0.0, 0.0, 0.0, 1.0), 0.5);
+      }
+
+      gl_FragColor = color;
+    }
+  `
+};
