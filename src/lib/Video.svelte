@@ -366,6 +366,6 @@
     }
 </style>
 
-<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null} />
-<img class:invisible={isVideo} bind:this={imgElement} />
+<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null} ></video>
+<img alt="img" class:invisible={isVideo} bind:this={imgElement} />
 <Stepper onParamsChange={handleParamsChange} />

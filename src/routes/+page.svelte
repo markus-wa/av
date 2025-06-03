@@ -5,6 +5,7 @@
 	import { toast, Toaster } from 'svelte-french-toast';
 	import Shader from '$lib/Shader.svelte';
 	import SwitchPro from '$lib/Controllers';
+	import HomerunMatrixSwitcher from '$lib/HomerunMatrixSwitcher';
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
@@ -20,6 +21,7 @@
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let showToaster: boolean = false;
 	let rStickPressStart: number | null = null;
+	let matrixSwitcher: HomerunMatrixSwitcher = new HomerunMatrixSwitcher();
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log("Media changed:", element);
@@ -124,6 +126,18 @@
 			});
 			updateGamepadList();
 			processGamepadState();
+			function handleClick() {
+				matrixSwitcher.connect({baudRate: 9600}).then(async () => {
+					console.log('Switcher version:', await matrixSwitcher.getVersion());
+					await matrixSwitcher.connectInputToOutput(1, 1);
+					await matrixSwitcher.connectInputToOutput(3, 4);
+					const conns = await matrixSwitcher.getAllConnections();
+					console.log('Current connections:', conns);
+					await matrixSwitcher.disconnect();
+				});
+				window.removeEventListener('click', handleClick);
+			}
+			window.addEventListener('click', handleClick);
 		}
 	});
 
