@@ -6,6 +6,7 @@
 	import Shader from '$lib/Shader.svelte';
 	import SwitchPro from '$lib/Controllers';
 	import HomerunMatrixSwitcher from '$lib/HomerunMatrixSwitcher';
+	import MatrixSwitcher from '$lib/MatrixSwitcher.svelte';
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
@@ -15,13 +16,13 @@
 	let videoComponent: Video;
 	let midiComponent: MIDI;
 	let shaderComponent: Shader;
+	let matrixSwitcherComponent: MatrixSwitcher;
 	let shiftPressed: boolean = false;
 	let controlledComponentIndex: number = 0;
 	let controlledComponents: ControlledComponent[];
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let showToaster: boolean = false;
 	let rStickPressStart: number | null = null;
-	let matrixSwitcher: HomerunMatrixSwitcher = new HomerunMatrixSwitcher();
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log("Media changed:", element);
@@ -33,7 +34,7 @@
 		onButtonStateChange(buttonIndex: number, isPressed: boolean): void;
 	}
 
-	$: controlledComponents = [midiComponent, videoComponent, shaderComponent];
+	$: controlledComponents = [midiComponent, videoComponent, shaderComponent, matrixSwitcherComponent];
 	$: controlledComponent = controlledComponents[controlledComponentIndex];
 	$: gamepad = gamepadsList[selectedGamepadIndex];
 
@@ -52,6 +53,8 @@
 			toast("Mode: MIDI");
 		} else if (controlledComponent === shaderComponent) {
 			toast("Mode: Shader");
+		} else if (controlledComponent === matrixSwitcherComponent) {
+			toast("Mode: Matrix Switcher");
 		}
 	}
 
@@ -126,18 +129,6 @@
 			});
 			updateGamepadList();
 			processGamepadState();
-			function handleClick() {
-				matrixSwitcher.connect({baudRate: 9600}).then(async () => {
-					console.log('Switcher version:', await matrixSwitcher.getVersion());
-					await matrixSwitcher.connectInputToOutput(1, 1);
-					await matrixSwitcher.connectInputToOutput(3, 4);
-					const conns = await matrixSwitcher.getAllConnections();
-					console.log('Current connections:', conns);
-					await matrixSwitcher.disconnect();
-				});
-				window.removeEventListener('click', handleClick);
-			}
-			window.addEventListener('click', handleClick);
 		}
 	});
 
@@ -153,6 +144,7 @@
 <MIDI bind:this={midiComponent} />
 <Video bind:this={videoComponent} onMediaChange={handleMediaChange}/>
 <Shader bind:this={shaderComponent} mediaElement={mediaElement}/>
+<MatrixSwitcher bind:this={matrixSwitcherComponent} />
 {#if showToaster}
 	<Toaster />
 {/if}
