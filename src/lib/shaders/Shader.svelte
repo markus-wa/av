@@ -10,7 +10,7 @@
 		Pixelation,
 		WaveformRipple,
 		type Shader
-	} from '$lib/Shaders';
+	} from '$lib/shaders/Shaders';
 	import SwitchPro from '$lib/Controllers';
 	import { UniformsUtils } from 'three';
 
@@ -48,8 +48,6 @@
 	}
 
 	$: {
-		console.log("Shader:", shader);
-
 		setShader(shader);
 	}
 

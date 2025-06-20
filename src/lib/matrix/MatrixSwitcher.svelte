@@ -1,30 +1,18 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import HomerunMatrixSwitcher from '$lib/HomerunMatrixSwitcher';
+	import HomerunMatrixSwitcher from '$lib/matrix/HomerunMatrixSwitcher';
+	import SwitchPro from '$lib/Controllers';
+	import { pathAABBAABB, pathABAB, pathCycleAB, pathRandomAll, pathRandomSome } from '$lib/matrix/Paths';
 
 	let matrixSwitcher: HomerunMatrixSwitcher = new HomerunMatrixSwitcher();
 	let nSwitches: number = 0;
 
-	async function preparePath(): Promise<void> {
-		const a = (nSwitches % 2) + 1;
-		const b = ((nSwitches + 1) % 2) + 1;
+	let pathIndex = 0;
+	let paths = [pathABAB, pathAABBAABB, pathRandomSome, pathRandomAll, pathCycleAB]
+	$: path = paths[pathIndex];
 
-		await matrixSwitcher.setPath(a, 1);
-		await matrixSwitcher.setPath(b, 2);
-		await matrixSwitcher.setPath(a, 3);
-		await matrixSwitcher.setPath(b, 4);
-		await matrixSwitcher.setPath(a, 5);
-		await matrixSwitcher.setPath(b, 6);
-		await matrixSwitcher.setPath(a, 7);
-		await matrixSwitcher.setPath(b, 8);
-		await matrixSwitcher.setPath(a, 9);
-		await matrixSwitcher.setPath(b, 10);
-		await matrixSwitcher.setPath(a, 11);
-		await matrixSwitcher.setPath(b, 12);
-		await matrixSwitcher.setPath(a, 13);
-		await matrixSwitcher.setPath(b, 14);
-		await matrixSwitcher.setPath(a, 15);
-		await matrixSwitcher.setPath(b, 16);
+	async function preparePath(): Promise<void> {
+		await path(matrixSwitcher, Math.abs(nSwitches));
 
 		nSwitches++;
 	}
@@ -41,8 +29,35 @@
 	export function onAxesStateChange(_axes: ReadonlyArray<number>): void {
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	export function onButtonStateChange(_buttonIndex: number, _isPressed: boolean): void {
+	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
+		if (buttonIndex == SwitchPro.LT) {
+			if (!isPressed) return;
+
+			nSwitches++;
+		} else if (buttonIndex == SwitchPro.RT) {
+			if (!isPressed) return;
+
+			nSwitches--;
+		} else if (buttonIndex == SwitchPro.LT2) {
+			if (!isPressed) return;
+
+			pathIndex--;
+			if (pathIndex < 0) {
+				pathIndex = paths.length - 1;
+			}
+
+			console.log("Selected path:", pathIndex);
+		} else if (buttonIndex == SwitchPro.RT2) {
+			if (!isPressed) return;
+
+			pathIndex++;
+
+			if (pathIndex >= paths.length) {
+				pathIndex = 0;
+			}
+
+			console.log("Selected path:", pathIndex);
+		}
 	}
 
 	onMount(() => {

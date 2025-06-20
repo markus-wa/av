@@ -8,7 +8,7 @@
 	export let onParamsChange: (p0: number, p1: number, p2: number, p3: number) => void;
 
 	let axesState: ReadonlyArray<number> = [0,0,0,0];
-	let paramInterval: number;
+	let paramInterval: ReturnType<typeof setInterval>;
 
 	$: {
 		onParamsChange(p0, p1, p2, p3);

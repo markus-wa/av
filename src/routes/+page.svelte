@@ -3,10 +3,9 @@
 	import Video from '$lib/Video.svelte';
 	import MIDI from '$lib/MIDI.svelte';
 	import { toast, Toaster } from 'svelte-french-toast';
-	import Shader from '$lib/Shader.svelte';
+	import Shader from '$lib/shaders/Shader.svelte';
 	import SwitchPro from '$lib/Controllers';
-	import HomerunMatrixSwitcher from '$lib/HomerunMatrixSwitcher';
-	import MatrixSwitcher from '$lib/MatrixSwitcher.svelte';
+	import MatrixSwitcher from '$lib/matrix/MatrixSwitcher.svelte';
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
@@ -145,6 +144,4 @@
 <Video bind:this={videoComponent} onMediaChange={handleMediaChange}/>
 <Shader bind:this={shaderComponent} mediaElement={mediaElement}/>
 <MatrixSwitcher bind:this={matrixSwitcherComponent} />
-{#if showToaster}
-	<Toaster />
-{/if}
+<Toaster containerStyle={showToaster ? "display: block;" : "display: none;"} />
