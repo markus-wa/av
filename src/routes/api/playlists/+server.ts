@@ -32,7 +32,7 @@ export const GET: RequestHandler = async () => {
 	// Read the top-level directories under MEDIA_DIR.
 	const items = await fs.readdir(MEDIA_DIR, { withFileTypes: true });
 	for (const item of items) {
-		if (item.isDirectory()) {
+		if (item.isDirectory() && !item.name.startsWith('.')) {
 			const playlistName = item.name;
 			// The full path to the playlist folder.
 			const playlistPath = path.join(MEDIA_DIR, playlistName);
