@@ -105,6 +105,8 @@
 			if (rStickPressStart !== null && performance.now() - rStickPressStart >= 3000) {
 				showToaster = !showToaster;
 				rStickPressStart = null;
+
+				toast(`Debug ${showToaster ? "ON" : "OFF"}`)
 			}
 
 			previousButtonStates = buttons.map(button => button.pressed);
