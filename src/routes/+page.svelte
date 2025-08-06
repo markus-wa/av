@@ -34,7 +34,7 @@
 		onButtonStateChange(buttonIndex: number, isPressed: boolean): void;
 	}
 
-	$: controlledComponents = [midiComponent, videoComponent, shaderComponent, matrixSwitcherComponent];
+	$: controlledComponents = [videoComponent, midiComponent, shaderComponent, matrixSwitcherComponent];
 	$: controlledComponent = controlledComponents[controlledComponentIndex];
 	$: gamepad = gamepadsList[selectedGamepadIndex];
 

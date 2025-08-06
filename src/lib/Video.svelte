@@ -18,7 +18,7 @@
 	let deviceIndex: number = 0;
 	let mediaIndex: number = 0;
 	let playlists: Playlist[];
-	let playlistIndex: number = 1;
+	let playlistIndex: number = 0;
 	let mode = 2;
 	let loopVideos = false;
 	let shuffle = true;
@@ -293,6 +293,10 @@
 	}
 
 	async function preloadMedia(url: string): Promise<void> {
+		if (url === videoElement?.src) {
+			return;
+		}
+
 		try {
 			const response = await fetch(url);
 			if (!response.ok) {
@@ -305,21 +309,27 @@
 
 	async function loadPlaylists() {
 		const resp = await fetch('/api/playlists');
-		playlists = await resp.json();
-		for (const playlist of playlists) {
+		let playlistsTmp = await resp.json();
+		for (const playlist of playlistsTmp.slice(1)) {
 			if (playlist.entries.length > 0) {
 				await preloadMedia(playlist.entries[0].url);
 			}
 		}
+		playlists = playlistsTmp;
 	}
 
 	$: {
 		if (mode === 2 && playlist) {
-			const nextIndex = (mediaIndex + 1) % playlist.entries.length;
-			const prevIndex = (mediaIndex - 1 + playlist.entries.length) % playlist.entries.length;
 			// Preload next and previous media
-			preloadMedia(playlist.entries[nextIndex].url);
-			preloadMedia(playlist.entries[prevIndex].url);
+			if (playlists.entries.length > 1) {
+				const nextIndex = (mediaIndex + 1) % playlist.entries.length;
+				preloadMedia(playlist.entries[nextIndex].url);
+
+				if (playlists.entries.length > 2) {
+					const prevIndex = (mediaIndex - 1 + playlist.entries.length) % playlist.entries.length;
+					preloadMedia(playlist.entries[prevIndex].url);
+				}
+			}
 		}
 	}
 
