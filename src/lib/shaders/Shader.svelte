@@ -37,6 +37,12 @@
 
 	$: shader = shaders[shaderIndex];
 
+	let paused = false;
+
+	export function setPaused(paused: boolean): void {
+		paused = paused;
+	}
+
 	function setShader(shader: Shader): void {
 		if (!material) return;
 

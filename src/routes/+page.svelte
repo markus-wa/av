@@ -22,6 +22,7 @@
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let showToaster: boolean = false;
 	let rStickPressStart: number | null = null;
+	let paused = false;
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log("Media changed:", element);
@@ -86,6 +87,19 @@
 							}
 							handled = true;
 						}
+						if (index === SwitchPro.D_UP) {
+							controlledComponentIndex = 0;
+							handled = true;
+						} else if (index === SwitchPro.D_LEFT) {
+							controlledComponentIndex = 1;
+							handled = true;
+						} else if (index === SwitchPro.D_RIGHT) {
+							controlledComponentIndex = 2;
+							handled = true;
+						}else if (index === SwitchPro.D_DOWN) {
+							controlledComponentIndex = 3;
+							handled = true;
+						}
 					}
 
 					if (index === SwitchPro.RIGHT_STICK) {
@@ -94,6 +108,16 @@
 						} else {
 							rStickPressStart = null;
 						}
+					}
+
+					if (index === SwitchPro.X) {
+						if (!pressed) return;
+
+						paused = !paused;
+						videoComponent?.setPaused(paused)
+						matrixSwitcherComponent?.setPaused(paused)
+						shaderComponent?.setPaused(paused)
+						handled = true;
 					}
 
 					if (!handled) {

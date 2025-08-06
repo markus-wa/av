@@ -27,7 +27,7 @@ async function getFilesRecursive(dir: string): Promise<string[]> {
 
 export const GET: RequestHandler = async () => {
 	// This will hold the final list of playlists.
-	const playlists: { name: string; entries: { url: string }[] }[] = [];
+	const playlists: { name: string; entries: { url: string }[], pausedMedia?: { name: string, url: string} }[] = [];
 
 	// Read the top-level directories under MEDIA_DIR.
 	const items = await fs.readdir(MEDIA_DIR, { withFileTypes: true });
@@ -45,13 +45,18 @@ export const GET: RequestHandler = async () => {
 			//    MEDIA_DIR/BCE/bce-tunnel.mp4
 			// will become:
 			//    /videos/bce-tunnel.mp4
-			const entries = files.map((filePath) => {
+			const entries = files.filter(f => !f.includes('/paused.')).map((filePath) => {
 				const url = "/api/media/"+encodeURI(path.relative(MEDIA_DIR, filePath));
 
 				return { url };
 			});
 
-			playlists.push({ name: playlistName, entries });
+			const pausedMedia = files.find(f => f.includes('/paused.'));
+
+			playlists.push({ name: playlistName, entries, pausedMedia: pausedMedia ? {
+					name: pausedMedia,
+					url: "/api/media/"+encodeURI(path.relative(MEDIA_DIR, pausedMedia))
+				} : undefined });
 		}
 	}
 

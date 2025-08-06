@@ -8,8 +8,14 @@
 	let nSwitches: number = 0;
 
 	let pathIndex = 0;
-	let paths = [pathABAB, pathAABBAABB, pathRandomSome, pathRandomAll, pathCycleAB]
+	let paths = [pathABAB, pathCycleAB, pathAABBAABB, pathRandomSome, pathRandomAll]
 	$: path = paths[pathIndex];
+	let isManual = false;
+	let lastManualSwitchAt = new Date().getMilliseconds();
+
+	export function setPaused(paused: boolean): void {
+		isManual = paused;
+	}
 
 	async function preparePath(): Promise<void> {
 		await path(matrixSwitcher, Math.abs(nSwitches));
@@ -17,10 +23,22 @@
 		nSwitches++;
 	}
 
-	async function onSwitch(): Promise<void> {
+	async function onSwitch(manual: boolean): Promise<void> {
+		if (isManual && !manual) {
+			return;
+		} else {
+			if (lastManualSwitchAt + 3000 < new Date().getMilliseconds()) {
+				return;
+			}
+		}
+
 		await matrixSwitcher.executeSwitch();
 
 		await preparePath();
+	}
+
+	async function onSwitchAuto(): Promise<void> {
+		await onSwitch(false);
 	}
 
 	let matrixSwitcherInterval: ReturnType<typeof setInterval>;
@@ -34,10 +52,18 @@
 			if (!isPressed) return;
 
 			nSwitches++;
+
+			preparePath().then(() => {
+				onSwitch(true);
+			})
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
 
 			nSwitches--;
+
+			preparePath().then(() => {
+				onSwitch(true);
+			})
 		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
 
@@ -57,6 +83,10 @@
 			}
 
 			console.log("Selected path:", pathIndex);
+		} else if (buttonIndex == SwitchPro.A) {
+			if (!isPressed) return;
+
+			isManual = !isManual;
 		}
 	}
 
@@ -69,9 +99,9 @@
 					clearInterval(matrixSwitcherInterval);
 
 					await preparePath();
-					await onSwitch();
+					await onSwitch(true);
 
-					matrixSwitcherInterval = setInterval(onSwitch, 5000);
+					matrixSwitcherInterval = setInterval(onSwitchAuto, 5000);
 				});
 				window.removeEventListener('click', handleClick);
 			}

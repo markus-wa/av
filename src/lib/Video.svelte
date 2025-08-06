@@ -8,6 +8,7 @@
 	interface Playlist {
 		name: string;
 		entries: { name: string, url: string }[];
+		pausedMedia?: { name: string, url: string };
 	}
 
 	export let videoElement: HTMLVideoElement | null = null;
@@ -18,16 +19,15 @@
 	let mediaIndex: number = 0;
 	let playlists: Playlist[];
 	let playlistIndex: number = 1;
-	let mode = 0;
+	let mode = 2;
 	let loopVideos = false;
-	let shuffle = false;
+	let shuffle = true;
 	let cutVideo = false;
 	let nextMediaIntervalSec = 5;
 	let nextMediaInterval: ReturnType<typeof setInterval>;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
 	// Shuffle-related state
-	let shuffleOrder: number[] = [];
 	let currentShuffleIndex: number = 0;
 
 	// Update the nextMedia timer when the interval changes
@@ -44,8 +44,12 @@
 	}
 
 	$: playlist = playlists && playlists[playlistIndex];
-	$: media = playlist && playlist.entries[mediaIndex];
+	$: media = (paused && playlist?.pausedMedia)
+		? playlist.pausedMedia
+		: (playlist && playlist.entries[shuffle ? shuffleOrder[currentShuffleIndex] : mediaIndex]);
+
 	$: isVideo = (mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4')));
+	$: shuffleOrder = generateShuffleOrder(playlist?.entries?.length || 0);
 
 	$: {
 		if (onMediaChange && (isVideo && videoElement) || (!isVideo && imgElement)) {
@@ -124,8 +128,18 @@
 		}
 	}
 
+	let paused = false;
+
+	export function setPaused(p: boolean): void {
+		console.log(playlist);
+		if (playlist.pausedMedia) {
+			paused = p;
+			playMedia(playlist.pausedMedia.url);
+		}
+	}
+
 	$: {
-		if (mode === 2 && media) {
+		if (mode === 2 && media && !paused) {
 			playMedia(media.url);
 		}
 	}
@@ -149,7 +163,6 @@
 	// Ensure the shuffle order is up-to-date when in shuffle mode
 	$: if (mode === 2 && playlist && shuffle) {
 		if (shuffleOrder.length !== playlist.entries.length || shuffleOrder.indexOf(mediaIndex) === -1) {
-			shuffleOrder = generateShuffleOrder(playlist.entries.length);
 			currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
 		}
 	}
@@ -195,11 +208,13 @@
 			if (!isPressed) return;
 			if (mode === 2) {
 				playlistIndex--;
+				shuffleOrder = generateShuffleOrder(playlist.entries.length);
 			}
 		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
 			if (mode === 2) {
 				playlistIndex++;
+				shuffleOrder = generateShuffleOrder(playlist.entries.length);
 			}
 		} else if (buttonIndex == SwitchPro.HOME) {
 			if (!isPressed) return;
@@ -211,7 +226,6 @@
 			if (!isPressed) return;
 			shuffle = !shuffle;
 			if (shuffle && playlist) {
-				shuffleOrder = generateShuffleOrder(playlist.entries.length);
 				currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
 			}
 		} else if (buttonIndex == SwitchPro.D_RIGHT) {
@@ -260,7 +274,7 @@
 	}
 
 	async function playMedia(url: string) {
-		if (isVideo) {
+		if (url.endsWith('.mp4')) {
 			if (!videoElement) return;
 			videoElement.srcObject = null;
 			videoElement.src = url;
@@ -361,8 +375,9 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        object-fit: cover;
+        object-fit: contain;
         z-index: -1;
+        background: black;
     }
 </style>
 
