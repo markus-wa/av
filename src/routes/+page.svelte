@@ -12,29 +12,20 @@
 	let axesState: ReadonlyArray<number> = [0,0,0,0];
 	let selectedGamepadIndex: number = 0;
 	let gamepadsList: Gamepad[] = [];
-	let videoComponent: Video;
-	let midiComponent: MIDI;
-	let shaderComponent: Shader;
 	let matrixSwitcherComponent: MatrixSwitcher;
 	let shiftPressed: boolean = false;
 	let controlledComponentIndex: number = 0;
 	let controlledComponents: ControlledComponent[];
-	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let showToaster: boolean = false;
 	let rStickPressStart: number | null = null;
 	let paused = false;
-
-	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
-		console.log("Media changed:", element);
-		mediaElement = element;
-	}
 
 	interface ControlledComponent {
 		onAxesStateChange(axesState: ReadonlyArray<number>): void;
 		onButtonStateChange(buttonIndex: number, isPressed: boolean): void;
 	}
 
-	$: controlledComponents = [videoComponent, midiComponent, shaderComponent, matrixSwitcherComponent];
+	$: controlledComponents = [matrixSwitcherComponent];
 	$: controlledComponent = controlledComponents[controlledComponentIndex];
 	$: gamepad = gamepadsList[selectedGamepadIndex];
 
@@ -47,13 +38,7 @@
 	}
 
 	$: {
-		if (controlledComponent === videoComponent) {
-			toast("Mode: Video");
-		} else if (controlledComponent === midiComponent) {
-			toast("Mode: MIDI");
-		} else if (controlledComponent === shaderComponent) {
-			toast("Mode: Shader");
-		} else if (controlledComponent === matrixSwitcherComponent) {
+		if (controlledComponent === matrixSwitcherComponent) {
 			toast("Mode: Matrix Switcher");
 		}
 	}
@@ -114,9 +99,7 @@
 						if (!pressed) return;
 
 						paused = !paused;
-						videoComponent?.setPaused(paused)
 						matrixSwitcherComponent?.setPaused(paused)
-						shaderComponent?.setPaused(paused)
 						handled = true;
 					}
 
@@ -166,8 +149,5 @@
 	});
 </script>
 
-<MIDI bind:this={midiComponent} />
-<Video bind:this={videoComponent} onMediaChange={handleMediaChange}/>
-<Shader bind:this={shaderComponent} mediaElement={mediaElement}/>
 <MatrixSwitcher bind:this={matrixSwitcherComponent} />
 <Toaster containerStyle={showToaster ? "display: block;" : "display: none;"} />

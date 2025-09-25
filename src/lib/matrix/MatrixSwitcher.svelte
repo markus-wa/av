@@ -101,7 +101,7 @@
 					await preparePath();
 					await onSwitch(true);
 
-					matrixSwitcherInterval = setInterval(onSwitchAuto, 5000);
+					matrixSwitcherInterval = setInterval(onSwitchAuto, 30000);
 				});
 				window.removeEventListener('click', handleClick);
 			}
