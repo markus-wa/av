@@ -7,6 +7,8 @@
 		ColorGrading,
 		CRT,
 		EdgeDetection,
+		Feedback,
+		Glitch,
 		Pixelation,
 		WaveformRipple,
 		type Shader
@@ -26,7 +28,7 @@
 	let stepper: Stepper;
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
-	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
+	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation, Glitch, Feedback];
 
 	// Get settings from store
 	$: shaderSettings = $settings.shader;
@@ -43,6 +45,16 @@
 	export function setPaused(p: boolean): void {
 		paused = p;
 		updateShaderSettings({ paused });
+	}
+
+	// Toggle FPS display
+	export function toggleFpsDisplay(): void {
+		showFps = !showFps;
+	}
+
+	// Get current FPS
+	export function getFps(): number {
+		return fps;
 	}
 
 	// Update store when settings change
@@ -162,6 +174,9 @@
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
 			updateShaderIndex(shaderIndex + 1);
+		} else if (buttonIndex == SwitchPro.HOME) {
+			if (!isPressed) return;
+			toggleFpsDisplay();
 		}
 	}
 
@@ -180,6 +195,24 @@
 	let audioStream: MediaStream | null = null;
 	let lastTime: number = 0;
 	let resizeHandler: (() => void) | null = null;
+	
+	// FPS monitoring
+	let fps: number = 0;
+	let frameCount: number = 0;
+	let lastFpsTime: number = 0;
+	let showFps: boolean = false;
+	let fpsStatus: 'high' | 'medium' | 'low' = 'high';
+	
+	// Update FPS status
+	$: {
+		if (fps >= 50) {
+			fpsStatus = 'high';
+		} else if (fps >= 30) {
+			fpsStatus = 'medium';
+		} else {
+			fpsStatus = 'low';
+		}
+	}
 
 	async function initAudio() {
 		try {
@@ -218,6 +251,16 @@
 	function animate() {
 		if (!renderer || !scene || !camera || paused) {
 			return;
+		}
+
+		// Calculate FPS
+		const now = performance.now();
+		frameCount++;
+		
+		if (now - lastFpsTime >= 1000) {
+			fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+			frameCount = 0;
+			lastFpsTime = now;
 		}
 
 		if (material?.uniforms.audioData && analyser && audioData) {
@@ -364,3 +407,65 @@
 </script>
 
 <Stepper bind:this={stepper} onParamsChange={handleParamsChanged} p0={shader?.uniforms.p0?.value || 0.5} p1={shader?.uniforms.p1?.value || 0.5} p2={shader?.uniforms.p2?.value || 0.5} p3={shader?.uniforms.p3?.value || 0.5} />
+
+{#if showFps}
+	<div class="fps-counter" class:high-fps={fpsStatus === 'high'} class:medium-fps={fpsStatus === 'medium'} class:low-fps={fpsStatus === 'low'}>
+		<div class="fps-value">{fps}</div>
+		<div class="fps-label">FPS</div>
+		<button class="fps-toggle" on:click={toggleFpsDisplay}>Hide</button>
+	</div>
+{/if}
+
+<style>
+	.fps-counter {
+		position: fixed;
+		top: 20px;
+		left: 20px;
+		background: rgba(0, 0, 0, 0.7);
+		color: white;
+		padding: 10px 15px;
+		border-radius: 8px;
+		font-family: monospace;
+		z-index: 10000;
+		backdrop-filter: blur(10px);
+	}
+	
+	.fps-value {
+		font-size: 24px;
+		font-weight: bold;
+		margin-bottom: 2px;
+	}
+	
+	.fps-label {
+		font-size: 12px;
+		opacity: 0.8;
+		margin-bottom: 5px;
+	}
+	
+	.fps-toggle {
+		background: rgba(255, 255, 255, 0.2);
+		color: white;
+		border: none;
+		padding: 4px 8px;
+		border-radius: 4px;
+		font-size: 11px;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+	
+	.fps-toggle:hover {
+		background: rgba(255, 255, 255, 0.3);
+	}
+	
+	.fps-counter.high-fps {
+		border-left: 3px solid #4CAF50;
+	}
+	
+	.fps-counter.medium-fps {
+		border-left: 3px solid #FFC107;
+	}
+	
+	.fps-counter.low-fps {
+		border-left: 3px solid #F44336;
+	}
+</style>

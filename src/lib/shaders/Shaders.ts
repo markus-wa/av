@@ -266,3 +266,166 @@ export const WaveformRipple = {
 		}
 	`
 };
+
+// RGB Split Glitch Effect
+export const Glitch = {
+	uniforms: {
+		tDiffuse: { value: null },
+		time: { value: 0.0 },
+		p0: { value: 0.5 },   // Glitch amount (0-1)
+		p1: { value: 0.1 },   // Glitch speed (0-1)
+		p2: { value: 0.0 },   // Color offset intensity
+		p3: { value: 0.5 }    // Block glitch amount
+	},
+	vertexShader: `
+		varying vec2 vUv;
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`,
+	fragmentShader: `
+		varying vec2 vUv;
+		uniform sampler2D tDiffuse;
+		uniform float time;
+		uniform float p0, p1, p2, p3;
+
+		// Random function
+		float rand(vec2 co) {
+			return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+		}
+
+		void main() {
+			vec2 uv = vUv;
+			
+			// Base color
+			vec4 color = texture2D(tDiffuse, uv);
+			
+			// Calculate glitch effect based on time and randomness
+			float glitchAmount = p0 * 0.1;
+			float glitchSpeed = 0.5 + p1 * 2.0;
+			float timeFactor = sin(time * glitchSpeed) * 0.5 + 0.5;
+			
+			// RGB split - offset each channel differently
+			float offsetR = sin(time * 2.0 + p2) * glitchAmount * 0.02 * timeFactor;
+			float offsetG = sin(time * 1.5 + p2 * 0.5) * glitchAmount * 0.01 * timeFactor;
+			float offsetB = sin(time * 1.0 + p2 * 0.3) * glitchAmount * 0.03 * timeFactor;
+			
+			float r = texture2D(tDiffuse, uv + vec2(offsetR, 0.0)).r;
+			float g = texture2D(tDiffuse, uv + vec2(offsetG, 0.0)).g;
+			float b = texture2D(tDiffuse, uv + vec2(offsetB, 0.0)).b;
+			
+			// Block glitch effect - randomly sample blocks
+			vec4 blockColor = color;
+			if (p3 > 0.0) {
+				float blockSize = 0.05 * p3;
+				vec2 blockUV = floor(uv / blockSize) * blockSize;
+				
+				// Random block displacement
+				if (rand(blockUV + vec2(time)) < 0.1 * p3) {
+					float randomX = (rand(blockUV + vec2(time * 0.1)) - 0.5) * 0.1 * p3;
+					float randomY = (rand(blockUV + vec2(time * 0.1, 1.0)) - 0.5) * 0.1 * p3;
+					blockColor = texture2D(tDiffuse, uv + vec2(randomX, randomY));
+				}
+			}
+			
+			// Mix RGB split with block glitch
+			color = vec4(r, g, b, 1.0);
+			color = mix(color, blockColor, p3);
+			
+			// Add some chromatic aberration at edges
+			vec2 center = vec2(0.5);
+			float edgeFactor = distance(uv, center);
+			edgeFactor = pow(edgeFactor, 2.0);
+			
+			color.r += offsetR * edgeFactor * 2.0;
+			color.g += offsetG * edgeFactor * 1.5;
+			color.b += offsetB * edgeFactor * 2.5;
+			
+			gl_FragColor = color;
+		}
+	`
+};
+
+// Feedback / Mirror Effect
+export const Feedback = {
+	uniforms: {
+		tDiffuse: { value: null },
+		time: { value: 0.0 },
+		p0: { value: 0.5 },   // Feedback amount (0-1)
+		p1: { value: 0.5 },   // Zoom factor
+		p2: { value: 0.0 },   // Rotation angle
+		p3: { value: 0.5 }    // Distortion amount
+	},
+	vertexShader: `
+		varying vec2 vUv;
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`,
+	fragmentShader: `
+		varying vec2 vUv;
+		uniform sampler2D tDiffuse;
+		uniform float time;
+		uniform float p0, p1, p2, p3;
+
+		// 2D rotation matrix
+		mat2 rotate2D(float angle) {
+			float s = sin(angle);
+			float c = cos(angle);
+			return mat2(c, -s, s, c);
+		}
+
+		void main() {
+			vec2 uv = vUv;
+			vec2 center = vec2(0.5);
+			
+			// Calculate vector from center
+			vec2 dir = uv - center;
+			
+			// Apply rotation based on p2
+			float rotation = p2 * 6.28318; // 0-1 -> 0-2π
+			mat2 rotationMatrix = rotate2D(rotation * time * 0.1);
+			vec2 rotatedDir = dir * rotationMatrix;
+			
+			// Apply zoom
+			float zoom = 1.0 + p1 * 0.5;
+			vec2 zoomedDir = rotatedDir * zoom;
+			
+			// Calculate feedback UV
+			vec2 feedbackUV = center + zoomedDir;
+			
+			// Add distortion
+			if (p3 > 0.0) {
+				// Wave distortion
+				feedbackUV.x += sin(feedbackUV.y * 20.0 + time) * p3 * 0.05;
+				feedbackUV.y += cos(feedbackUV.x * 20.0 + time) * p3 * 0.05;
+				
+				// Clip to [0,1] range
+				feedbackUV = clamp(feedbackUV, 0.0, 1.0);
+			}
+			
+			// Get original color
+			vec4 originalColor = texture2D(tDiffuse, uv);
+			
+			// Get feedback color (recursive texture lookup)
+			vec4 feedbackColor = texture2D(tDiffuse, feedbackUV);
+			
+			// Blend based on feedback amount
+			vec4 color = mix(originalColor, feedbackColor, p0);
+			
+			// Invert feedback for interesting effect
+			feedbackColor.rgb = 1.0 - feedbackColor.rgb;
+			
+			// Add inverted feedback
+			color = mix(color, feedbackColor, p0 * 0.5);
+			
+			// Add time-based pulsing
+			float pulse = sin(time * 2.0) * 0.5 + 0.5;
+			color.rgb *= mix(1.0, vec3(1.0, 0.8, 0.6), p0 * pulse * 0.3);
+			
+			gl_FragColor = color;
+		}
+	`
+};
