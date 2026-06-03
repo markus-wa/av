@@ -110,6 +110,9 @@
 	onDestroy(() => {
 		matrixSwitcher.disconnect();
 		clearTimeout(hideTimer);
+		if (matrixSwitcherInterval) {
+			clearInterval(matrixSwitcherInterval);
+		}
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('click', handleUserInteraction);
 			window.removeEventListener('keydown', handleUserInteraction);
