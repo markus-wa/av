@@ -34,6 +34,10 @@ export class HomerunMatrixSwitcher {
 	private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
 	private isConnected = false;
 	private commandDelayMs = 100; // Required 50ms delay between commands
+	private reconnectAttempts = 0;
+	private maxReconnectAttempts = 3;
+	private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+	private lastConnectTime: number = 0;
 
 	// Default configuration matching manual specifications
 	private config: SerialConfig = {
@@ -45,6 +49,13 @@ export class HomerunMatrixSwitcher {
 	};
 
 	/**
+	 * Check if currently connected to a serial port
+	 */
+	isPortConnected(): boolean {
+		return this.isConnected && this.port !== null;
+	}
+
+	/**
 	 * Connect to the HOMERUN switcher
 	 */
 	async connect(config?: Partial<SerialConfig>): Promise<void> {
@@ -52,12 +63,16 @@ export class HomerunMatrixSwitcher {
 			throw new Error('Web Serial API not supported in this browser');
 		}
 
+		// Clear any existing reconnection attempts
+		this.clearReconnect();
+
 		try {
 			// Merge custom config with defaults
 			const finalConfig = { ...this.config, ...config };
 
 			// Request port from user
 			this.port = await navigator.serial.requestPort();
+			this.lastConnectTime = Date.now();
 
 			// Open the port with configuration
 			await this.port.open(finalConfig);
@@ -67,30 +82,109 @@ export class HomerunMatrixSwitcher {
 			this.writer = this.port.writable?.getWriter() || null;
 
 			this.isConnected = true;
+			this.reconnectAttempts = 0;
 			console.log('Connected to HOMERUN Matrix Switcher');
 
 		} catch (error) {
+			// Clean up partial connection
+			this.isConnected = false;
+			this.clearReconnect();
 			throw new Error(`Failed to connect: ${error}`);
 		}
+	}
+
+	/**
+	 * Attempt to reconnect if connection was lost
+	 * This can be called after a user gesture (like a click)
+	 */
+	async attemptReconnect(config?: Partial<SerialConfig>): Promise<boolean> {
+		if (this.isConnected) {
+			return true; // Already connected
+		}
+
+		if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+			console.log('Max reconnection attempts reached');
+			return false;
+		}
+
+		try {
+			// Need user gesture for requestPort, so this should be called from a click handler
+			this.reconnectAttempts++;
+			console.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+			
+			// Clear existing resources
+			this.clearReconnect();
+			
+			// Try to connect
+			const finalConfig = { ...this.config, ...config };
+			this.port = await navigator.serial.requestPort();
+			this.lastConnectTime = Date.now();
+			await this.port.open(finalConfig);
+			
+			this.reader = this.port.readable?.getReader() || null;
+			this.writer = this.port.writable?.getWriter() || null;
+			
+			this.isConnected = true;
+			this.reconnectAttempts = 0;
+			console.log('Reconnected to HOMERUN Matrix Switcher');
+			return true;
+			
+		} catch (error) {
+			console.error(`Reconnection attempt ${this.reconnectAttempts} failed:`, error);
+			this.isConnected = false;
+			return false;
+		}
+	}
+
+	/**
+	 * Clear any pending reconnection attempts
+	 */
+	private clearReconnect(): void {
+		if (this.reconnectTimeout) {
+			clearTimeout(this.reconnectTimeout);
+			this.reconnectTimeout = null;
+		}
+		this.reconnectAttempts = 0;
+	}
+
+	/**
+	 * Get time since last connection attempt
+	 */
+	getTimeSinceLastConnect(): number {
+		return Date.now() - this.lastConnectTime;
 	}
 
 	/**
 	 * Disconnect from the switcher
 	 */
 	async disconnect(): Promise<void> {
+		this.clearReconnect();
+		
 		if (this.reader) {
-			await this.reader.cancel();
-			this.reader.releaseLock();
+			try {
+				await this.reader.cancel();
+				this.reader.releaseLock();
+			} catch (error) {
+				console.error('Error canceling reader:', error);
+			}
 			this.reader = null;
 		}
 
 		if (this.writer) {
-			await this.writer.close();
+			try {
+				await this.writer.close();
+			} catch (error) {
+				console.error('Error closing writer:', error);
+			}
 			this.writer = null;
 		}
 
 		if (this.port) {
-			await this.port.close();
+			try {
+				await this.port.close();
+			} catch (error) {
+				console.error('Error closing port:', error);
+			}
 			this.port = null;
 		}
 
