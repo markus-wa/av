@@ -65,13 +65,15 @@
 			showModal = true;
 			startHideTimer();
 			// Force cursor visibility
-			document.body.style.cursor = 'auto';
+			if (typeof document !== 'undefined') {
+				document.body.style.cursor = 'auto';
+			}
 		}
 	}
 
 	// Reset cursor when modal hides
 	$: {
-		if (!showModal) {
+		if (!showModal && typeof document !== 'undefined') {
 			document.body.style.cursor = '';
 		}
 	}
