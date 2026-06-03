@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import HomerunMatrixSwitcher from '$lib/matrix/HomerunMatrixSwitcher';
 	import SwitchPro from '$lib/Controllers';
 	import { pathAABBAABB, pathABAB, pathCycleAB, pathRandomAll, pathRandomSome } from '$lib/matrix/Paths';
@@ -65,7 +66,7 @@
 			showModal = true;
 			startHideTimer();
 			// Force cursor visibility
-			if (typeof document !== 'undefined') {
+			if (browser) {
 				document.body.style.cursor = 'auto';
 			}
 		}
@@ -73,7 +74,7 @@
 
 	// Reset cursor when modal hides
 	$: {
-		if (!showModal && typeof document !== 'undefined') {
+		if (!showModal && browser) {
 			document.body.style.cursor = '';
 		}
 	}
