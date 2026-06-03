@@ -58,7 +58,7 @@
 		clearTimeout(hideTimer);
 		hideTimer = setTimeout(() => {
 			showModal = false;
-		}, 10000);
+		}, 5000);
 	}
 
 	let previousCursor: string = '';
@@ -131,9 +131,9 @@
 
 	onMount(() => {
 		if (typeof window !== 'undefined') {
-			// Show modal on first click only (not on load)
+			// Show modal on any click (not just first)
 			// Don't show on mousemove (bass shaking moves mouse)
-			window.addEventListener('click', handleUserInteraction, { passive: true, once: true });
+			window.addEventListener('click', handleUserInteraction, { passive: true });
 			window.addEventListener('keydown', handleUserInteraction, { passive: true });
 			window.addEventListener('touchstart', handleUserInteraction, { passive: true });
 		}
@@ -171,15 +171,18 @@
 					<span class="disconnected">⚪ Disconnected</span>
 				{/if}
 			</p>
-			<button on:click={connectSerial} disabled={connectionStatus === 'connecting'}>
-				{#if connectionStatus === 'connecting'}
-					Connecting...
-				{:else if connectionStatus === 'connected'}
-					✓ Connected
-				{:else}
-					Connect Serial Port
-				{/if}
-			</button>
+			<div class="modal-buttons">
+				<button on:click={connectSerial} disabled={connectionStatus === 'connecting'}>
+					{#if connectionStatus === 'connecting'}
+						Connecting...
+					{:else if connectionStatus === 'connected'}
+						✓ Connected
+					{:else}
+						Connect Serial Port
+					{/if}
+				</button>
+				<button class="close-button" on:click={() => showModal = false}>×</button>
+			</div>
 		</div>
 	</div>
 {/if}
@@ -259,5 +262,23 @@
 	.serial-modal-content button:disabled {
 		background: #666;
 		cursor: not-allowed;
+	}
+
+	.modal-buttons {
+		display: flex;
+		gap: 10px;
+		justify-content: center;
+		margin-top: 1rem;
+	}
+
+	.close-button {
+		background: #f44336;
+		padding: 0.75rem 1rem;
+		font-size: 1.2rem;
+		min-width: auto;
+	}
+
+	.close-button:hover {
+		background: #d32f2f;
 	}
 </style>
