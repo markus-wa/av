@@ -25,22 +25,33 @@
 	let cutVideo = false;
 	let nextMediaIntervalSec = 5;
 	let nextMediaInterval: ReturnType<typeof setInterval>;
+	let hlsInstance: Hls | null = null;
+	let currentStream: MediaStream | null = null;
+	let currentVideoUrl: string | null = null;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
 	// Shuffle-related state
 	let currentShuffleIndex: number = 0;
 
-	// Update the nextMedia timer when the interval changes
-	$: {
+	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
+	function handleParamsChange(newNextMediaIntervalSec: number): void {
+		// Only update if value actually changed to avoid recreating interval
+		const newValue = 1 + Math.floor(newNextMediaIntervalSec * 9);
+		if (newValue !== nextMediaIntervalSec) {
+			nextMediaIntervalSec = newValue;
+			// Recreate interval with new timing
+			if (nextMediaInterval) {
+				clearInterval(nextMediaInterval);
+			}
+			nextMediaInterval = setInterval(nextMedia, nextMediaIntervalSec * 1000);
+		}
+	}
+
+	function setupInterval() {
 		if (nextMediaInterval) {
 			clearInterval(nextMediaInterval);
 		}
 		nextMediaInterval = setInterval(nextMedia, nextMediaIntervalSec * 1000);
-	}
-
-	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
-	function handleParamsChange(newNextMediaIntervalSec: number): void {
-		nextMediaIntervalSec = 1 + Math.floor(newNextMediaIntervalSec * 9);
 	}
 
 	$: playlist = playlists && playlists[playlistIndex];
@@ -52,24 +63,27 @@
 	$: shuffleOrder = generateShuffleOrder(playlist?.entries?.length || 0);
 
 	$: {
-		if (onMediaChange && (isVideo && videoElement) || (!isVideo && imgElement)) {
+		if (onMediaChange && ((isVideo && videoElement) || (!isVideo && imgElement))) {
 			onMediaChange(isVideo ? videoElement! : imgElement!);
 		}
 	}
 
 	async function getCameras(): Promise<void> {
-		await navigator.mediaDevices.getUserMedia({ video: true });
-		console.log("Getting cameras...");
-		const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-		devices = mediaDevices.filter((device) => device.kind === "videoinput");
-		devicesIds = [
-			...devices.map((device) => device.deviceId),
-			'screen',
-		];
-		console.log(mediaDevices);
+		try {
+			await navigator.mediaDevices.getUserMedia({ video: true });
+			const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+			devices = mediaDevices.filter((device) => device.kind === "videoinput");
+			devicesIds = [
+				...devices.map((device) => device.deviceId),
+				'screen',
+			];
+		} catch (error) {
+			console.error("Error getting cameras:", error);
+			toast("Error accessing cameras");
+		}
 	}
 
-	// Ensure indices stay within range. For mediaIndex we skip auto‑correction in shuffle mode.
+	// Ensure indices stay within range
 	$: {
 		if (mode === 0) {
 			if (deviceIndex >= devicesIds.length) {
@@ -101,19 +115,8 @@
 	$: selectedDeviceId = devicesIds[deviceIndex];
 
 	$: {
-		toast(`Loop: ${loopVideos ? 'ON' : 'OFF'}`);
-	}
-
-	$: {
-		toast(`Cut: ${cutVideo ? 'ON' : 'OFF'}`);
-	}
-
-	$: {
-		toast(`Shuffle: ${shuffle ? 'ON' : 'OFF'}`);
-	}
-
-	$: {
 		if (mode === 0) {
+			cleanupMedia();
 			if (selectedDeviceId === 'screen') {
 				startScreenCapture();
 			} else {
@@ -124,6 +127,7 @@
 
 	$: {
 		if (mode === 1) {
+			cleanupMedia();
 			startHLS();
 		}
 	}
@@ -131,16 +135,20 @@
 	let paused = false;
 
 	export function setPaused(p: boolean): void {
-		console.log(playlist);
-		if (playlist.pausedMedia) {
+		if (playlist?.pausedMedia) {
 			paused = p;
+			cleanupMedia();
 			playMedia(playlist.pausedMedia.url);
 		}
 	}
 
 	$: {
 		if (mode === 2 && media && !paused) {
-			playMedia(media.url);
+			if (media.url !== currentVideoUrl) {
+				currentVideoUrl = media.url;
+				cleanupMedia();
+				playMedia(media.url);
+			}
 		}
 	}
 
@@ -150,7 +158,7 @@
 		}
 	}
 
-	// Generate a shuffled order using the Fisher–Yates algorithm
+	// Generate a shuffled order using the Fisher-Yates algorithm
 	function generateShuffleOrder(length: number): number[] {
 		const order = Array.from({ length }, (_, i) => i);
 		for (let i = order.length - 1; i > 0; i--) {
@@ -164,6 +172,32 @@
 	$: if (mode === 2 && playlist && shuffle) {
 		if (shuffleOrder.length !== playlist.entries.length || shuffleOrder.indexOf(mediaIndex) === -1) {
 			currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
+		}
+	}
+
+	function cleanupMedia() {
+		// Clean up HLS instance
+		if (hlsInstance) {
+			hlsInstance.destroy();
+			hlsInstance = null;
+		}
+
+		// Stop media streams
+		if (currentStream) {
+			currentStream.getTracks().forEach(track => track.stop());
+			currentStream = null;
+		}
+
+		// Clear video element
+		if (videoElement) {
+			videoElement.srcObject = null;
+			videoElement.src = '';
+			videoElement.onended = null;
+		}
+
+		// Clear image element
+		if (imgElement) {
+			imgElement.src = '';
 		}
 	}
 
@@ -237,45 +271,68 @@
 	export function onAxesStateChange(): void {}
 
 	async function startCamera(deviceId: string): Promise<void> {
-		const label = devices.find((device) => device.deviceId === deviceId)?.label;
-		toast(`Starting camera: ${label}`);
-		if (!deviceId) return;
-		const stream = await navigator.mediaDevices.getUserMedia({
-			video: { deviceId: { exact: deviceId } },
-		});
-		if (videoElement) {
-			videoElement.srcObject = stream;
+		try {
+			const label = devices.find((device) => device.deviceId === deviceId)?.label;
+			toast(`Starting camera: ${label}`);
+			if (!deviceId) return;
+
+			// Clean up previous stream
+			cleanupMedia();
+
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: { deviceId: { exact: deviceId } },
+			});
+			currentStream = stream;
+			if (videoElement) {
+				videoElement.srcObject = stream;
+			}
+		} catch (error) {
+			console.error("Error starting camera:", error);
+			toast("Failed to start camera");
 		}
 	}
 
 	async function startScreenCapture(): Promise<void> {
 		try {
+			cleanupMedia();
 			const stream = await navigator.mediaDevices.getDisplayMedia({
 				video: true
 			});
+			currentStream = stream;
 			if (videoElement) {
 				videoElement.srcObject = stream;
 			}
 			toast("Started screen capture");
-		} catch {
+		} catch (error) {
+			console.error("Error starting screen capture:", error);
 			toast("Failed to start screen capture");
 		}
 	}
 
 	function startHLS() {
+		cleanupMedia();
 		if (!videoElement) return;
-		videoElement.srcObject = null;
+
 		const hls = new Hls();
+		hlsInstance = hls;
+		
 		hls.loadSource('http://fl1.moveonjoy.com/NICKELODEON/index.m3u8');
 		hls.attachMedia(videoElement);
 		hls.on(Hls.Events.MANIFEST_PARSED, function() {
-			videoElement!.play();
+			videoElement!.play().catch(e => console.error("HLS playback error:", e));
+		});
+		hls.on(Hls.Events.ERROR, function(event, data) {
+			if (data.fatal) {
+				console.error("HLS fatal error:", data);
+				toast("HLS stream error");
+			}
 		});
 	}
 
 	async function playMedia(url: string) {
 		if (url.endsWith('.mp4')) {
 			if (!videoElement) return;
+			cleanupMedia();
 			videoElement.srcObject = null;
 			videoElement.src = url;
 			videoElement.onended = () => {
@@ -285,7 +342,12 @@
 					mediaIndex++;
 				}
 			};
-			await videoElement.play();
+			try {
+				await videoElement.play();
+			} catch (error) {
+				console.error("Error playing video:", error);
+				toast("Error playing video");
+			}
 		} else {
 			if (!imgElement) return;
 			imgElement.src = url;
@@ -293,12 +355,12 @@
 	}
 
 	async function preloadMedia(url: string): Promise<void> {
-		if (url === videoElement?.src) {
+		if (url === videoElement?.src || url === currentVideoUrl) {
 			return;
 		}
 
 		try {
-			const response = await fetch(url);
+			const response = await fetch(url, { method: 'HEAD' });
 			if (!response.ok) {
 				console.error(`Failed to preload media: ${url}`);
 			}
@@ -308,24 +370,29 @@
 	}
 
 	async function loadPlaylists() {
-		const resp = await fetch('/api/playlists');
-		let playlistsTmp = await resp.json();
-		for (const playlist of playlistsTmp.slice(1)) {
-			if (playlist.entries.length > 0) {
-				await preloadMedia(playlist.entries[0].url);
+		try {
+			const resp = await fetch('/api/playlists');
+			let playlistsTmp = await resp.json();
+			for (const playlist of playlistsTmp.slice(1)) {
+				if (playlist.entries.length > 0) {
+					await preloadMedia(playlist.entries[0].url);
+				}
 			}
+			playlists = playlistsTmp;
+		} catch (error) {
+			console.error("Error loading playlists:", error);
+			toast("Error loading playlists");
 		}
-		playlists = playlistsTmp;
 	}
 
 	$: {
 		if (mode === 2 && playlist) {
 			// Preload next and previous media
-			if (playlists.entries.length > 1) {
+			if (playlist.entries.length > 1) {
 				const nextIndex = (mediaIndex + 1) % playlist.entries.length;
 				preloadMedia(playlist.entries[nextIndex].url);
 
-				if (playlists.entries.length > 2) {
+				if (playlist.entries.length > 2) {
 					const prevIndex = (mediaIndex - 1 + playlist.entries.length) % playlist.entries.length;
 					preloadMedia(playlist.entries[prevIndex].url);
 				}
@@ -362,33 +429,37 @@
 
 	onMount(() => {
 		reload();
+		setupInterval();
 	});
+
 	onDestroy(() => {
+		// Clean up all resources
 		clearInterval(nextMediaInterval);
+		cleanupMedia();
 	});
 </script>
 
 <style>
-    video {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        object-fit: cover;
-        z-index: -1;
-        background: black;
-    }
-    img {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        object-fit: contain;
-        z-index: -1;
-        background: black;
-    }
+	video {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		object-fit: cover;
+		z-index: -1;
+		background: black;
+	}
+	img {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		object-fit: contain;
+		z-index: -1;
+		background: black;
+	}
 </style>
 
 <video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null} ></video>
