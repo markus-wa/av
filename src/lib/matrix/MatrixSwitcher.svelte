@@ -199,12 +199,10 @@
 		cursor: auto !important;
 	}
 
-	// Global cursor hiding - cursor is hidden everywhere by default
 	:global(body) {
 		cursor: none !important;
 	}
 	
-	// Show cursor only when modal is visible
 	:global(body.modal-visible) {
 		cursor: auto !important;
 	}
