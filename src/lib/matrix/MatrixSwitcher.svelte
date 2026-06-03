@@ -3,20 +3,37 @@
 	import HomerunMatrixSwitcher from '$lib/matrix/HomerunMatrixSwitcher';
 	import SwitchPro from '$lib/Controllers';
 	import { pathAABBAABB, pathABAB, pathCycleAB, pathRandomAll, pathRandomSome } from '$lib/matrix/Paths';
+	import { settings, updateMatrixSettings } from '$lib/stores/settings';
 
 	let matrixSwitcher: HomerunMatrixSwitcher = new HomerunMatrixSwitcher();
 	let nSwitches: number = 0;
-	let pathIndex = 0;
-	let paths = [pathABAB, pathCycleAB, pathAABBAABB, pathRandomSome, pathRandomAll]
-	$: path = paths[pathIndex];
-	let isManual = false;
+	let paths = [pathABAB, pathCycleAB, pathAABBAABB, pathRandomSome, pathRandomAll];
+
+	// Get settings from store
+	$: matrixSettings = $settings.matrix;
+	let pathIndex = matrixSettings.pathIndex;
+	let isManual = matrixSettings.isManual;
 	let lastManualSwitchAt = new Date().getMilliseconds();
 	let showModal = false;
 	let hideTimer: ReturnType<typeof setTimeout>;
 	let connectionStatus = 'disconnected';
+	let matrixSwitcherInterval: ReturnType<typeof setInterval>;
+
+	$: path = paths[pathIndex];
+
+	// Update store when settings change
+	function updatePathIndex(newIndex: number) {
+		pathIndex = newIndex;
+		updateMatrixSettings({ pathIndex });
+	}
+
+	function updateIsManual(newValue: boolean) {
+		isManual = newValue;
+		updateMatrixSettings({ isManual });
+	}
 
 	export function setPaused(paused: boolean): void {
-		isManual = paused;
+		updateIsManual(paused);
 	}
 
 	async function preparePath(): Promise<void> {
@@ -35,8 +52,6 @@
 	async function onSwitchAuto(): Promise<void> {
 		await onSwitch(false);
 	}
-
-	let matrixSwitcherInterval: ReturnType<typeof setInterval>;
 
 	function startHideTimer() {
 		clearTimeout(hideTimer);
@@ -81,15 +96,21 @@
 			preparePath().then(() => onSwitch(true));
 		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
-			pathIndex--;
-			if (pathIndex < 0) pathIndex = paths.length - 1;
+			updatePathIndex(pathIndex - 1);
+			if (pathIndex < 0) {
+				updatePathIndex(paths.length - 1);
+			}
+			console.log("Selected path:", pathIndex);
 		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
-			pathIndex++;
-			if (pathIndex >= paths.length) pathIndex = 0;
+			updatePathIndex(pathIndex + 1);
+			if (pathIndex >= paths.length) {
+				updatePathIndex(0);
+			}
+			console.log("Selected path:", pathIndex);
 		} else if (buttonIndex == SwitchPro.A) {
 			if (!isPressed) return;
-			isManual = !isManual;
+			updateIsManual(!isManual);
 		}
 	}
 

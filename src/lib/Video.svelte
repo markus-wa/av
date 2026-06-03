@@ -4,6 +4,7 @@
 	import { toast } from 'svelte-french-toast';
 	import SwitchPro from '$lib/Controllers';
 	import Stepper from '$lib/Stepper.svelte';
+	import { settings, updateVideoSettings } from '$lib/stores/settings';
 
 	interface Playlist {
 		name: string;
@@ -15,30 +16,79 @@
 	export let imgElement: HTMLImageElement | null = null;
 	let devices: MediaDeviceInfo[] = [];
 	let devicesIds: string[] = ['screen'];
-	let deviceIndex: number = 0;
-	let mediaIndex: number = 0;
 	let playlists: Playlist[];
-	let playlistIndex: number = 0;
-	let mode = 2;
-	let loopVideos = false;
-	let shuffle = true;
-	let cutVideo = false;
-	let nextMediaIntervalSec = 5;
-	let nextMediaInterval: ReturnType<typeof setInterval>;
 	let hlsInstance: Hls | null = null;
 	let currentStream: MediaStream | null = null;
 	let currentVideoUrl: string | null = null;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
+	// Get settings from store
+	$: videoSettings = $settings.video;
+	let mode = videoSettings.mode;
+	let loopVideos = videoSettings.loopVideos;
+	let shuffle = videoSettings.shuffle;
+	let cutVideo = videoSettings.cutVideo;
+	let nextMediaIntervalSec = videoSettings.nextMediaIntervalSec;
+	let deviceIndex = videoSettings.deviceIndex;
+	let mediaIndex = videoSettings.mediaIndex;
+	let playlistIndex = videoSettings.playlistIndex;
+
 	// Shuffle-related state
 	let currentShuffleIndex: number = 0;
+
+	// Update store when settings change
+	function updateMode(newMode: number) {
+		mode = newMode;
+		updateVideoSettings({ mode });
+	}
+
+	function updateLoop(newLoop: boolean) {
+		loopVideos = newLoop;
+		updateVideoSettings({ loopVideos });
+		toast(`Loop: ${loopVideos ? 'ON' : 'OFF'}`);
+	}
+
+	function updateShuffle(newShuffle: boolean) {
+		shuffle = newShuffle;
+		updateVideoSettings({ shuffle });
+		toast(`Shuffle: ${shuffle ? 'ON' : 'OFF'}`);
+		if (shuffle && playlist) {
+			currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
+		}
+	}
+
+	function updateCut(newCut: boolean) {
+		cutVideo = newCut;
+		updateVideoSettings({ cutVideo });
+		toast(`Cut: ${cutVideo ? 'ON' : 'OFF'}`);
+	}
+
+	function updateNextMediaInterval(newInterval: number) {
+		nextMediaIntervalSec = newInterval;
+		updateVideoSettings({ nextMediaIntervalSec });
+	}
+
+	function updateDeviceIndex(newIndex: number) {
+		deviceIndex = newIndex;
+		updateVideoSettings({ deviceIndex });
+	}
+
+	function updateMediaIndex(newIndex: number) {
+		mediaIndex = newIndex;
+		updateVideoSettings({ mediaIndex });
+	}
+
+	function updatePlaylistIndex(newIndex: number) {
+		playlistIndex = newIndex;
+		updateVideoSettings({ playlistIndex });
+	}
 
 	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
 	function handleParamsChange(newNextMediaIntervalSec: number): void {
 		// Only update if value actually changed to avoid recreating interval
 		const newValue = 1 + Math.floor(newNextMediaIntervalSec * 9);
 		if (newValue !== nextMediaIntervalSec) {
-			nextMediaIntervalSec = newValue;
+			updateNextMediaInterval(newValue);
 			// Recreate interval with new timing
 			if (nextMediaInterval) {
 				clearInterval(nextMediaInterval);
@@ -47,6 +97,8 @@
 		}
 	}
 
+	let nextMediaInterval: ReturnType<typeof setInterval>;
+	
 	function setupInterval() {
 		if (nextMediaInterval) {
 			clearInterval(nextMediaInterval);
@@ -65,50 +117,6 @@
 	$: {
 		if (onMediaChange && ((isVideo && videoElement) || (!isVideo && imgElement))) {
 			onMediaChange(isVideo ? videoElement! : imgElement!);
-		}
-	}
-
-	async function getCameras(): Promise<void> {
-		try {
-			await navigator.mediaDevices.getUserMedia({ video: true });
-			const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-			devices = mediaDevices.filter((device) => device.kind === "videoinput");
-			devicesIds = [
-				...devices.map((device) => device.deviceId),
-				'screen',
-			];
-		} catch (error) {
-			console.error("Error getting cameras:", error);
-			toast("Error accessing cameras");
-		}
-	}
-
-	// Ensure indices stay within range
-	$: {
-		if (mode === 0) {
-			if (deviceIndex >= devicesIds.length) {
-				deviceIndex = 0;
-			} else if (deviceIndex < 0) {
-				deviceIndex = devicesIds.length - 1;
-			}
-		} else if (mode === 2 && playlist) {
-			if (!shuffle) {
-				if (mediaIndex >= playlist.entries.length) {
-					mediaIndex = 0;
-				} else if (mediaIndex < 0) {
-					mediaIndex = playlist.entries.length - 1;
-				}
-			}
-		}
-	}
-
-	$: {
-		if (mode === 2 && playlists) {
-			if (playlistIndex >= playlists.length) {
-				playlistIndex = 0;
-			} else if (playlistIndex < 0) {
-				playlistIndex = playlists.length - 1;
-			}
 		}
 	}
 
@@ -132,13 +140,9 @@
 		}
 	}
 
-	let paused = false;
-
-	export function setPaused(p: boolean): void {
-		if (playlist?.pausedMedia) {
-			paused = p;
-			cleanupMedia();
-			playMedia(playlist.pausedMedia.url);
+	$: {
+		if (mode === 2 && playlist) {
+			toast(`Playlist: ${playlist.name}`);
 		}
 	}
 
@@ -152,9 +156,13 @@
 		}
 	}
 
-	$: {
-		if (mode === 2 && playlist) {
-			toast(`Playlist: ${playlist.name}`);
+	let paused = false;
+
+	export function setPaused(p: boolean): void {
+		paused = p;
+		if (playlist?.pausedMedia) {
+			cleanupMedia();
+			playMedia(playlist.pausedMedia.url);
 		}
 	}
 
@@ -201,53 +209,82 @@
 		}
 	}
 
+	// Ensure indices stay within range
+	$: {
+		if (mode === 0) {
+			if (deviceIndex >= devicesIds.length) {
+				updateDeviceIndex(0);
+			} else if (deviceIndex < 0) {
+				updateDeviceIndex(devicesIds.length - 1);
+			}
+		} else if (mode === 2 && playlist) {
+			if (!shuffle) {
+				if (mediaIndex >= playlist.entries.length) {
+					updateMediaIndex(0);
+				} else if (mediaIndex < 0) {
+					updateMediaIndex(playlist.entries.length - 1);
+				}
+			}
+		}
+	}
+
+	$: {
+		if (mode === 2 && playlists) {
+			if (playlistIndex >= playlists.length) {
+				updatePlaylistIndex(0);
+			} else if (playlistIndex < 0) {
+				updatePlaylistIndex(playlists.length - 1);
+			}
+		}
+	}
+
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
 		if (buttonIndex == SwitchPro.SELECT) {
 			if (!isPressed) return;
 			if (mode === 2) {
-				mode = 0;
+				updateMode(0);
 			} else {
-				mode++;
+				updateMode(mode + 1);
 			}
 		} else if (buttonIndex == SwitchPro.START) {
 			if (!isPressed) return;
 			if (mode === 0) {
-				mode = 2;
+				updateMode(2);
 			} else {
-				mode--;
+				updateMode(mode - 1);
 			}
 		} else if (buttonIndex == SwitchPro.LT) {
 			if (!isPressed) return;
 			if (mode === 0) {
-				deviceIndex--;
+				updateDeviceIndex(deviceIndex - 1);
 			} else if (mode === 2) {
 				if (shuffle) {
 					prevShuffleMedia();
 				} else {
-					mediaIndex--;
+					updateMediaIndex(mediaIndex - 1);
 				}
 			}
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
 			if (mode === 0) {
-				deviceIndex++;
+				updateDeviceIndex(deviceIndex + 1);
 			} else if (mode === 2) {
 				if (shuffle) {
 					nextShuffleMedia();
 				} else {
-					mediaIndex++;
+					updateMediaIndex(mediaIndex + 1);
 				}
 			}
 		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
 			if (mode === 2) {
-				playlistIndex--;
+				updatePlaylistIndex(playlistIndex - 1);
 				shuffleOrder = generateShuffleOrder(playlist.entries.length);
 			}
 		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
 			if (mode === 2) {
-				playlistIndex++;
+				updatePlaylistIndex(playlistIndex + 1);
 				shuffleOrder = generateShuffleOrder(playlist.entries.length);
 			}
 		} else if (buttonIndex == SwitchPro.HOME) {
@@ -255,20 +292,32 @@
 			reload();
 		} else if (buttonIndex == SwitchPro.D_LEFT) {
 			if (!isPressed) return;
-			loopVideos = !loopVideos;
+			updateLoop(!loopVideos);
 		} else if (buttonIndex == SwitchPro.D_UP) {
 			if (!isPressed) return;
-			shuffle = !shuffle;
-			if (shuffle && playlist) {
-				currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
-			}
+			updateShuffle(!shuffle);
 		} else if (buttonIndex == SwitchPro.D_RIGHT) {
 			if (!isPressed) return;
-			cutVideo = !cutVideo;
+			updateCut(!cutVideo);
 		}
 	}
 
 	export function onAxesStateChange(): void {}
+
+	async function getCameras(): Promise<void> {
+		try {
+			await navigator.mediaDevices.getUserMedia({ video: true });
+			const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+			devices = mediaDevices.filter((device) => device.kind === "videoinput");
+			devicesIds = [
+				...devices.map((device) => device.deviceId),
+				'screen',
+			];
+		} catch (error) {
+			console.error("Error getting cameras:", error);
+			toast("Error accessing cameras");
+		}
+	}
 
 	async function startCamera(deviceId: string): Promise<void> {
 		try {
@@ -339,7 +388,7 @@
 				if (shuffle) {
 					nextShuffleMedia();
 				} else {
-					mediaIndex++;
+					updateMediaIndex(mediaIndex + 1);
 				}
 			};
 			try {
@@ -403,13 +452,13 @@
 	function nextShuffleMedia() {
 		if (!playlist) return;
 		currentShuffleIndex = (currentShuffleIndex + 1) % shuffleOrder.length;
-		mediaIndex = shuffleOrder[currentShuffleIndex];
+		updateMediaIndex(shuffleOrder[currentShuffleIndex]);
 	}
 
 	function prevShuffleMedia() {
 		if (!playlist) return;
 		currentShuffleIndex = (currentShuffleIndex - 1 + shuffleOrder.length) % shuffleOrder.length;
-		mediaIndex = shuffleOrder[currentShuffleIndex];
+		updateMediaIndex(shuffleOrder[currentShuffleIndex]);
 	}
 
 	function reload() {
@@ -422,7 +471,7 @@
 			if (shuffle) {
 				nextShuffleMedia();
 			} else {
-				mediaIndex++;
+				updateMediaIndex(mediaIndex + 1);
 			}
 		}
 	}

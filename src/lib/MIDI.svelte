@@ -2,21 +2,25 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-french-toast';
 	import SwitchPro from '$lib/Controllers.js';
+	import { settings, updateMidiSettings } from '$lib/stores/settings';
 
 	let axesState: ReadonlyArray<number> = [0,0,0,0];
 	let midiAccess: MIDIAccess | null = null;
 	let midiOutput: MIDIOutput | null = null;
 	let midiOutputs: MIDIOutput[] = [];
-	let selectedMidiIndex: number = 0;
 	let midiInterval: ReturnType<typeof setInterval>;
-	let cc0: number = 63;
-	let cc1: number = 63;
-	let cc2: number = 63;
-	let cc3: number = 63;
-	let stepSize: number = 8;
 	let shiftPressed: boolean = false;
 	let toggleState: { [key: number]: boolean } = {};
 	let lastMidiOutput: MIDIOutput | null = null;
+
+	// Get settings from store
+	$: midiSettings = $settings.midi;
+	let stepSize = midiSettings.stepSize;
+	let selectedMidiIndex = midiSettings.selectedMidiIndex;
+	let cc0 = midiSettings.cc0;
+	let cc1 = midiSettings.cc1;
+	let cc2 = midiSettings.cc2;
+	let cc3 = midiSettings.cc3;
 
 	const gates: { [key: number]: number } = {
 		[SwitchPro.B]: 4,
@@ -35,6 +39,25 @@
 		[SwitchPro.D_LEFT]: 14,
 		[SwitchPro.D_RIGHT]: 15,
 	};
+
+	// Update store when settings change
+	function updateStepSize(newSize: number) {
+		stepSize = newSize;
+		updateMidiSettings({ stepSize });
+	}
+
+	function updateSelectedMidiIndex(newIndex: number) {
+		selectedMidiIndex = newIndex;
+		updateMidiSettings({ selectedMidiIndex });
+	}
+
+	function updateCCValues(c0: number, c1: number, c2: number, c3: number) {
+		cc0 = c0;
+		cc1 = c1;
+		cc2 = c2;
+		cc3 = c3;
+		updateMidiSettings({ cc0, cc1, cc2, cc3 });
+	}
 
 	async function initMIDI(): Promise<void> {
 		try {
@@ -59,7 +82,7 @@
 						// Previously selected device disconnected
 						lastMidiOutput = null;
 						if (midiOutputs.length > 0) {
-							selectedMidiIndex = 0;
+							updateSelectedMidiIndex(0);
 							midiOutput = midiOutputs[0];
 							lastMidiOutput = midiOutput;
 						} else {
@@ -70,11 +93,22 @@
 			};
 			
 			midiOutputs = Array.from(midiAccess.outputs.values());
-			selectedMidiIndex = Math.max(midiOutputs.findIndex((output) => output.name?.includes("CH345")), 0);
 			
-			if (midiOutputs.length > 0) {
+			// Try to restore selected MIDI index from settings
+			if (selectedMidiIndex >= 0 && selectedMidiIndex < midiOutputs.length) {
 				midiOutput = midiOutputs[selectedMidiIndex];
 				lastMidiOutput = midiOutput;
+			} else {
+				// Fallback to CH345 or first device
+				selectedMidiIndex = Math.max(midiOutputs.findIndex((output) => output.name?.includes("CH345")), 0);
+				updateSelectedMidiIndex(selectedMidiIndex);
+				if (midiOutputs.length > 0) {
+					midiOutput = midiOutputs[selectedMidiIndex];
+					lastMidiOutput = midiOutput;
+				}
+			}
+			
+			if (midiOutput) {
 				console.log("Selected MIDI output:", midiOutput.name);
 			} else {
 				toast("No MIDI outputs available.");
@@ -134,15 +168,12 @@
 
 		if (newCC0 === cc0 && newCC1 === cc1 && newCC2 === cc2 && newCC3 === cc3) return;
 
-		sendMIDICC(0, 2, cc0);
-		sendMIDICC(1, 2, cc1);
-		sendMIDICC(2, 2, cc2);
-		sendMIDICC(3, 2, cc3);
+		sendMIDICC(0, 2, newCC0);
+		sendMIDICC(1, 2, newCC1);
+		sendMIDICC(2, 2, newCC2);
+		sendMIDICC(3, 2, newCC3);
 
-		cc0 = newCC0;
-		cc1 = newCC1;
-		cc2 = newCC2;
-		cc3 = newCC3;
+		updateCCValues(newCC0, newCC1, newCC2, newCC3);
 	}
 
 	function sendMIDINoteOn(channel: number, note: number, velocity: number = 127): void {
@@ -174,7 +205,7 @@
 			v = 127;
 		}
 
-		stepSize = v;
+		updateStepSize(v);
 		console.log("stepSize:", stepSize);
 	}
 
@@ -207,12 +238,13 @@
 			if (!isPressed) return;
 
 			if (shiftPressed) {
-				selectedMidiIndex--;
-				if (selectedMidiIndex < 0) {
-					selectedMidiIndex = midiOutputs.length - 1;
+				let newIndex = selectedMidiIndex - 1;
+				if (newIndex < 0) {
+					newIndex = midiOutputs.length - 1;
 				}
 
 				if (midiOutputs.length > 0) {
+					updateSelectedMidiIndex(newIndex);
 					midiOutput = midiOutputs[selectedMidiIndex];
 					lastMidiOutput = midiOutput;
 					console.log("Selected MIDI device:", midiOutput.name);
@@ -224,13 +256,14 @@
 			if (!isPressed) return;
 
 			if (shiftPressed) {
-				selectedMidiIndex++;
+				let newIndex = selectedMidiIndex + 1;
 
-				if (selectedMidiIndex >= midiOutputs.length) {
-					selectedMidiIndex = 0;
+				if (newIndex >= midiOutputs.length) {
+					newIndex = 0;
 				}
 
 				if (midiOutputs.length > 0) {
+					updateSelectedMidiIndex(newIndex);
 					midiOutput = midiOutputs[selectedMidiIndex];
 					lastMidiOutput = midiOutput;
 					console.log("Selected MIDI device:", midiOutput.name);
@@ -241,7 +274,7 @@
 		} else if (buttonIndex === SwitchPro.SCREENSHOT) {
 			shiftPressed = isPressed;
 		} else if (buttonIndex === SwitchPro.HOME) {
-			selectedMidiIndex = 0;
+			updateSelectedMidiIndex(0);
 			if (midiOutputs.length > 0) {
 				midiOutput = midiOutputs[0];
 				lastMidiOutput = midiOutput;

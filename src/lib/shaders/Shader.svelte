@@ -13,6 +13,7 @@
 	} from '$lib/shaders/Shaders';
 	import SwitchPro from '$lib/Controllers';
 	import { UniformsUtils } from 'three';
+	import { settings, updateShaderSettings } from '$lib/stores/settings';
 
 	export let mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
 
@@ -26,14 +27,11 @@
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
 	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation];
-	let shaderIndex = 0;
-	let audioContext: AudioContext | null = null;
-	let analyser: AnalyserNode | null = null;
-	let audioData: Float32Array | null = null;
-	let audioStream: MediaStream | null = null;
-	let lastTime: number = 0;
-	let paused = false;
-	let resizeHandler: (() => void) | null = null;
+
+	// Get settings from store
+	$: shaderSettings = $settings.shader;
+	let shaderIndex = shaderSettings.shaderIndex;
+	let paused = shaderSettings.paused;
 
 	$: {
 		if (shaderIndex < 0) shaderIndex = shaders.length - 1;
@@ -44,6 +42,13 @@
 
 	export function setPaused(p: boolean): void {
 		paused = p;
+		updateShaderSettings({ paused });
+	}
+
+	// Update store when settings change
+	function updateShaderIndex(newIndex: number) {
+		shaderIndex = newIndex;
+		updateShaderSettings({ shaderIndex });
 	}
 
 	function cleanupThreeJS() {
@@ -153,10 +158,10 @@
 
 		if (buttonIndex == SwitchPro.LT) {
 			if (!isPressed) return;
-			shaderIndex--;
+			updateShaderIndex(shaderIndex - 1);
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
-			shaderIndex++;
+			updateShaderIndex(shaderIndex + 1);
 		}
 	}
 
@@ -168,6 +173,13 @@
 		if (material.uniforms.p2) material.uniforms.p2.value = p2;
 		if (material.uniforms.p3) material.uniforms.p3.value = p3;
 	}
+
+	let audioContext: AudioContext | null = null;
+	let analyser: AnalyserNode | null = null;
+	let audioData: Float32Array | null = null;
+	let audioStream: MediaStream | null = null;
+	let lastTime: number = 0;
+	let resizeHandler: (() => void) | null = null;
 
 	async function initAudio() {
 		try {
