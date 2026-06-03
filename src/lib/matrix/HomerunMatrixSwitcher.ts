@@ -437,7 +437,7 @@ export class HomerunMatrixSwitcher {
 	async getVersion(): Promise<string> {
 		// Note: VERN command doesn't support F suffix but returns version directly
 		const response = await this.sendCommand('[VERN]', true);
-		return response.replace(/[\[\]]/g, ''); // Remove brackets
+		return response.replace(/[[\]]/g, ''); // Remove brackets
 	}
 
 	/**
@@ -577,7 +577,7 @@ export class HomerunMatrixSwitcher {
 		const connections: ConnectionStatus[] = [];
 		// Parse response format: Each pair of digits represents input connected to that output
 		// Example: "010000030000" means output 1->input 1, output 4->input 3
-		const cleanResponse = response.replace(/[\[\]]/g, '');
+		const cleanResponse = response.replace(/[[\]]/g, '');
 
 		// Each output is represented by 2 characters showing which input is connected
 		for (let i = 0; i < cleanResponse.length; i += 2) {
@@ -596,7 +596,7 @@ export class HomerunMatrixSwitcher {
 
 	private parseOutputList(response: string): number[] {
 		const outputs: number[] = [];
-		const cleanResponse = response.replace(/[\[\]]/g, '');
+		const cleanResponse = response.replace(/[[\]]/g, '');
 
 		// Parse pairs of digits as output numbers
 		for (let i = 0; i < cleanResponse.length; i += 2) {
@@ -622,7 +622,9 @@ export class HomerunSwitcherExample {
 			// Test connection
 			const isConnected = await this.switcher.testConnection();
 			if (!isConnected) {
-				throw new Error('Connection test failed');
+				console.error('Connection test failed');
+
+				return
 			}
 
 			// Get version info
