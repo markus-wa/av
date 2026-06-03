@@ -61,12 +61,15 @@
 		}, 10000);
 	}
 
+	let previousCursor: string = '';
+
 	function handleUserInteraction() {
 		if (!matrixSwitcher.isPortConnected()) {
 			showModal = true;
 			startHideTimer();
-			// Force cursor visibility
+			// Save and force cursor visibility
 			if (browser) {
+				previousCursor = document.body.style.cursor;
 				document.body.style.cursor = 'auto';
 			}
 		}
@@ -75,7 +78,7 @@
 	// Reset cursor when modal hides
 	$: {
 		if (!showModal && browser) {
-			document.body.style.cursor = '';
+			document.body.style.cursor = previousCursor;
 		}
 	}
 
@@ -128,14 +131,10 @@
 
 	onMount(() => {
 		if (typeof window !== 'undefined') {
-			// Show modal on load
-			showModal = true;
-			startHideTimer();
-
-			// Listen for any user interaction
-			window.addEventListener('click', handleUserInteraction, { passive: true });
+			// Show modal on first click only (not on load)
+			// Don't show on mousemove (bass shaking moves mouse)
+			window.addEventListener('click', handleUserInteraction, { passive: true, once: true });
 			window.addEventListener('keydown', handleUserInteraction, { passive: true });
-			window.addEventListener('mousemove', handleUserInteraction, { passive: true });
 			window.addEventListener('touchstart', handleUserInteraction, { passive: true });
 		}
 	});
