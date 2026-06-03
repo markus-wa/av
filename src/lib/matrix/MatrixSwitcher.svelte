@@ -61,24 +61,21 @@
 		}, 5000);
 	}
 
-	let previousCursor: string = '';
-
 	function handleUserInteraction() {
 		if (!matrixSwitcher.isPortConnected()) {
 			showModal = true;
 			startHideTimer();
-			// Save and force cursor visibility
+			// Add class to body to show cursor
 			if (browser) {
-				previousCursor = document.body.style.cursor;
-				document.body.style.cursor = 'auto';
+				document.body.classList.add('modal-visible');
 			}
 		}
 	}
 
-	// Reset cursor when modal hides
+	// Remove class when modal hides - hides cursor everywhere
 	$: {
 		if (!showModal && browser) {
-			document.body.style.cursor = previousCursor;
+			document.body.classList.remove('modal-visible');
 		}
 	}
 
@@ -199,6 +196,16 @@
 		align-items: center;
 		z-index: 10000;
 		pointer-events: none;
+		cursor: auto !important;
+	}
+
+	// Global cursor hiding - cursor is hidden everywhere by default
+	:global(body) {
+		cursor: none !important;
+	}
+	
+	// Show cursor only when modal is visible
+	:global(body.modal-visible) {
 		cursor: auto !important;
 	}
 
