@@ -64,6 +64,15 @@
 		if (!matrixSwitcher.isPortConnected()) {
 			showModal = true;
 			startHideTimer();
+			// Force cursor visibility
+			document.body.style.cursor = 'auto';
+		}
+	}
+
+	// Reset cursor when modal hides
+	$: {
+		if (!showModal) {
+			document.body.style.cursor = '';
 		}
 	}
 
@@ -185,6 +194,7 @@
 		align-items: center;
 		z-index: 10000;
 		pointer-events: none;
+		cursor: auto !important;
 	}
 
 	.serial-modal-content {
