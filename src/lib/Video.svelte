@@ -22,16 +22,16 @@
 	let currentVideoUrl: string | null = null;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
-	// Get settings from store
-	$: videoSettings = $settings.video;
-	let mode = videoSettings.mode;
-	let loopVideos = videoSettings.loopVideos;
-	let shuffle = videoSettings.shuffle;
-	let cutVideo = videoSettings.cutVideo;
-	let nextMediaIntervalSec = videoSettings.nextMediaIntervalSec;
-	let deviceIndex = videoSettings.deviceIndex;
-	let mediaIndex = videoSettings.mediaIndex;
-	let playlistIndex = videoSettings.playlistIndex;
+	// Get settings from store with defaults
+	$: videoSettings = $settings.video || { mode: 2, loopVideos: false, shuffle: true, cutVideo: false, nextMediaIntervalSec: 5, deviceIndex: 0, mediaIndex: 0, playlistIndex: 0 };
+	$: mode = videoSettings.mode;
+	$: loopVideos = videoSettings.loopVideos;
+	$: shuffle = videoSettings.shuffle;
+	$: cutVideo = videoSettings.cutVideo;
+	$: nextMediaIntervalSec = videoSettings.nextMediaIntervalSec;
+	$: deviceIndex = videoSettings.deviceIndex;
+	$: mediaIndex = videoSettings.mediaIndex;
+	$: playlistIndex = videoSettings.playlistIndex;
 
 	// Shuffle-related state
 	let currentShuffleIndex: number = 0;

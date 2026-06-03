@@ -13,14 +13,14 @@
 	let toggleState: { [key: number]: boolean } = {};
 	let lastMidiOutput: MIDIOutput | null = null;
 
-	// Get settings from store
-	$: midiSettings = $settings.midi;
-	let stepSize = midiSettings.stepSize;
-	let selectedMidiIndex = midiSettings.selectedMidiIndex;
-	let cc0 = midiSettings.cc0;
-	let cc1 = midiSettings.cc1;
-	let cc2 = midiSettings.cc2;
-	let cc3 = midiSettings.cc3;
+	// Get settings from store with defaults
+	$: midiSettings = $settings.midi || { stepSize: 8, selectedMidiIndex: 0, cc0: 63, cc1: 63, cc2: 63, cc3: 63 };
+	$: stepSize = midiSettings.stepSize;
+	$: selectedMidiIndex = midiSettings.selectedMidiIndex;
+	$: cc0 = midiSettings.cc0;
+	$: cc1 = midiSettings.cc1;
+	$: cc2 = midiSettings.cc2;
+	$: cc3 = midiSettings.cc3;
 
 	const gates: { [key: number]: number } = {
 		[SwitchPro.B]: 4,

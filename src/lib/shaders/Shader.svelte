@@ -31,10 +31,10 @@
 	let mesh: THREE.Mesh | null = null;
 	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation, Glitch, Feedback];
 
-	// Get settings from store
-	$: shaderSettings = $settings.shader;
-	let shaderIndex = shaderSettings.shaderIndex;
-	let paused = shaderSettings.paused;
+	// Get settings from store with defaults
+	$: shaderSettings = $settings.shader || { shaderIndex: 0, paused: false };
+	$: shaderIndex = shaderSettings.shaderIndex;
+	$: paused = shaderSettings.paused;
 
 	$: {
 		if (shaderIndex < 0) shaderIndex = shaders.length - 1;

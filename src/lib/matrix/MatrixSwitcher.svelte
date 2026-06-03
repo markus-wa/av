@@ -9,10 +9,10 @@
 	let nSwitches: number = 0;
 	let paths = [pathABAB, pathCycleAB, pathAABBAABB, pathRandomSome, pathRandomAll];
 
-	// Get settings from store
-	$: matrixSettings = $settings.matrix;
-	let pathIndex = matrixSettings.pathIndex;
-	let isManual = matrixSettings.isManual;
+	// Get settings from store with defaults
+	$: matrixSettings = $settings.matrix || { pathIndex: 0, isManual: false };
+	$: pathIndex = matrixSettings.pathIndex;
+	$: isManual = matrixSettings.isManual;
 	let lastManualSwitchAt = new Date().getMilliseconds();
 	let showModal = false;
 	let hideTimer: ReturnType<typeof setTimeout>;
