@@ -43,6 +43,12 @@
 
 	$: shader = shaders[shaderIndex];
 
+	$: {
+		if (shader) {
+			console.log("Shader changed:", shaderIndex, shader.name);
+		}
+	}
+
 	export function setPaused(p: boolean): void {
 		paused = p;
 		updateShaderSettings({ paused });
@@ -359,6 +365,7 @@
 	$: materialInitialized = material !== null;
 
 	$: if (mediaElement && materialInitialized) {
+			console.log("Shader mediaElement changed:", mediaElement);
 			cleanupTexture();
 			
 			if (mediaElement instanceof HTMLVideoElement) {

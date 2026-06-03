@@ -39,8 +39,7 @@ export async function registerServiceWorker(): Promise<void> {
 
 		// Register new service worker
 		registration = await navigator.serviceWorker.register('/service-worker.js', {
-			scope: '/',
-			type: 'module'
+			scope: '/'
 		});
 
 		console.log('[Service Worker Client] Registered service worker');

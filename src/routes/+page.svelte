@@ -62,7 +62,7 @@
 
 	function updateGamepadList(): void {
 		const gamepads = navigator.getGamepads();
-		gamepadsList = Array.from(gamepads).filter((gp): gp is Gamepad => gp !== null);
+		gamepadsList = Array.from(gamepads).filter((gp): gp is Gamepad => gp !== null && gp.connected);
 		console.log("Gamepads:", gamepadsList);
 	}
 
@@ -141,7 +141,10 @@
 			}
 			axesState = gamepad.axes;
 		}
-		animationFrame = requestAnimationFrame(processGamepadState);
+		// Only continue animation frame loop if there's an active gamepad
+		if (gamepad || gamepadsList.length > 0) {
+			animationFrame = requestAnimationFrame(processGamepadState);
+		}
 	}
 
 	onMount(() => {
@@ -153,6 +156,7 @@
 			window.addEventListener('gamepaddisconnected', () => {
 				console.log("Gamepad disconnected");
 				updateGamepadList();
+				processGamepadState();
 			});
 			updateGamepadList();
 			processGamepadState();

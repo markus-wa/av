@@ -7,6 +7,20 @@ export default defineConfig({
 	plugins: [
 		tailwindcss(),
 		sveltekit(),
+		{
+			name: 'service-worker-dev',
+			configureServer(server) {
+				server.middlewares.use('/service-worker.js', (req, res) => {
+					const swCode = `
+self.addEventListener('install', e => e.waitUntil(self.skipWaiting()));
+self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+console.log('[Service Worker] Dev mode');
+`;
+					res.setHeader('Content-Type', 'application/javascript');
+					res.end(swCode);
+				});
+			}
+		}
 	],
 	server: {
 		open: true,

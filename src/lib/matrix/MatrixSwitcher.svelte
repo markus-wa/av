@@ -61,6 +61,11 @@
 		}, 5000);
 	}
 
+	function hideModal() {
+		clearTimeout(hideTimer);
+		showModal = false;
+	}
+
 	function handleUserInteraction() {
 		if (!matrixSwitcher.isPortConnected()) {
 			showModal = true;
@@ -145,15 +150,14 @@
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('click', handleUserInteraction);
 			window.removeEventListener('keydown', handleUserInteraction);
-			window.removeEventListener('mousemove', handleUserInteraction);
 			window.removeEventListener('touchstart', handleUserInteraction);
 		}
 	});
 </script>
 
 {#if showModal}
-	<div class="serial-modal" on:click|stopPropagation>
-		<div class="serial-modal-content">
+	<div class="serial-modal" on:click|stopPropagation={hideModal}>
+		<div class="serial-modal-content" on:click|stopPropagation>
 			<h2>Connect Matrix Switcher</h2>
 			<p>Click below to connect to the Altinex HOMERUN switcher via serial port.</p>
 			<p class="status">
@@ -195,18 +199,19 @@
 		justify-content: center;
 		align-items: center;
 		z-index: 10000;
-		pointer-events: none;
+		background: rgba(0, 0, 0, 0.5);
 		cursor: auto !important;
 	}
 
 	:global(body) {
 		cursor: none !important;
 	}
-	
+
 	:global(body.modal-visible) {
 		cursor: auto !important;
 	}
 
+	/* Global cursor hiding - cursor is hidden everywhere by default */
 	.serial-modal-content {
 		background: rgba(0, 0, 0, 0.9);
 		color: white;

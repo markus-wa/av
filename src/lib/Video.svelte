@@ -32,6 +32,10 @@
 	$: deviceIndex = videoSettings.deviceIndex;
 	$: mediaIndex = videoSettings.mediaIndex;
 	$: playlistIndex = videoSettings.playlistIndex;
+	// Clamp playlistIndex to valid range when playlists are loaded
+	$: if (playlists && playlists.length > 0 && playlistIndex >= playlists.length) {
+		updatePlaylistIndex(playlists.length - 1);
+	}
 
 	// Shuffle-related state
 	let currentShuffleIndex: number = 0;
@@ -40,6 +44,18 @@
 	function updateMode(newMode: number) {
 		mode = newMode;
 		updateVideoSettings({ mode });
+		// Handle media initialization directly within user gesture context
+		if (newMode === 0) {
+			cleanupMedia();
+			if (selectedDeviceId === 'screen') {
+				startScreenCapture();
+			} else {
+				startCamera(selectedDeviceId);
+			}
+		} else if (newMode === 1) {
+			cleanupMedia();
+			startHLS();
+		}
 	}
 
 	function updateLoop(newLoop: boolean) {
@@ -121,24 +137,6 @@
 	}
 
 	$: selectedDeviceId = devicesIds[deviceIndex];
-
-	$: {
-		if (mode === 0) {
-			cleanupMedia();
-			if (selectedDeviceId === 'screen') {
-				startScreenCapture();
-			} else {
-				startCamera(selectedDeviceId);
-			}
-		}
-	}
-
-	$: {
-		if (mode === 1) {
-			cleanupMedia();
-			startHLS();
-		}
-	}
 
 	$: {
 		if (mode === 2 && playlist) {
@@ -228,15 +226,7 @@
 		}
 	}
 
-	$: {
-		if (mode === 2 && playlists) {
-			if (playlistIndex >= playlists.length) {
-				updatePlaylistIndex(0);
-			} else if (playlistIndex < 0) {
-				updatePlaylistIndex(playlists.length - 1);
-			}
-		}
-	}
+
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
 		if (buttonIndex == SwitchPro.SELECT) {
@@ -277,15 +267,15 @@
 			}
 		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
-			if (mode === 2) {
-				updatePlaylistIndex(playlistIndex - 1);
-				shuffleOrder = generateShuffleOrder(playlist.entries.length);
+			if (mode === 2 && playlists && playlists.length > 0) {
+				const newIndex = (playlistIndex - 1 + playlists.length) % playlists.length;
+				updatePlaylistIndex(newIndex);
 			}
 		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
-			if (mode === 2) {
-				updatePlaylistIndex(playlistIndex + 1);
-				shuffleOrder = generateShuffleOrder(playlist.entries.length);
+			if (mode === 2 && playlists && playlists.length > 0) {
+				const newIndex = (playlistIndex + 1) % playlists.length;
+				updatePlaylistIndex(newIndex);
 			}
 		} else if (buttonIndex == SwitchPro.HOME) {
 			if (!isPressed) return;
@@ -428,6 +418,7 @@
 				}
 			}
 			playlists = playlistsTmp;
+		console.log("Playlists loaded:", playlists);
 		} catch (error) {
 			console.error("Error loading playlists:", error);
 			toast("Error loading playlists");

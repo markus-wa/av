@@ -1,10 +1,12 @@
 export interface Shader {
+	name: string;
 	uniforms: { [key: string]: { value: any } };
 	vertexShader: string;
 	fragmentShader: string;
 }
 
 export const CRT = {
+	name: 'CRT',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
@@ -38,6 +40,7 @@ export const CRT = {
 }
 
 export const ColorGrading = {
+	name: 'ColorGrading',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
@@ -98,6 +101,7 @@ export const ColorGrading = {
 };
 
 export const Pixelation = {
+	name: 'Pixelation',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
@@ -132,6 +136,7 @@ export const Pixelation = {
 };
 
 export const ChromaticAberration = {
+	name: 'ChromaticAberration',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
@@ -165,6 +170,7 @@ export const ChromaticAberration = {
 };
 
 export const EdgeDetection = {
+	name: 'Edge Detection',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
@@ -209,6 +215,7 @@ export const EdgeDetection = {
 };
 
 export const WaveformRipple = {
+	name: 'WaveformRipple',
 	uniforms: {
 		tDiffuse: { value: null },
 		audioData: { value: new Float32Array(512) },
@@ -269,6 +276,7 @@ export const WaveformRipple = {
 
 // RGB Split Glitch Effect
 export const Glitch = {
+	name: 'Glitch',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
@@ -349,6 +357,7 @@ export const Glitch = {
 
 // Feedback / Mirror Effect
 export const Feedback = {
+	name: 'Feedback',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },

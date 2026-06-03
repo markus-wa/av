@@ -611,13 +611,6 @@ export class HomerunMatrixSwitcher {
 	}
 
 	/**
-	 * Check if connected
-	 */
-	isPortConnected(): boolean {
-		return this.isConnected;
-	}
-
-	/**
 	 * Get current configuration
 	 */
 	getConfiguration(): SerialConfig {
