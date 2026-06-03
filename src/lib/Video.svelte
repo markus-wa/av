@@ -22,8 +22,8 @@
 	let currentVideoUrl: string | null = null;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
-	// Get settings from store with defaults
-	$: videoSettings = $settings.video || { mode: 2, loopVideos: false, shuffle: true, cutVideo: false, nextMediaIntervalSec: 5, deviceIndex: 0, mediaIndex: 0, playlistIndex: 0 };
+	// Get settings from store
+	$: videoSettings = $settings.video;
 	$: mode = videoSettings.mode;
 	$: loopVideos = videoSettings.loopVideos;
 	$: shuffle = videoSettings.shuffle;

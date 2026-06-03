@@ -31,8 +31,8 @@
 	let mesh: THREE.Mesh | null = null;
 	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation, Glitch, Feedback];
 
-	// Get settings from store with defaults
-	$: shaderSettings = $settings.shader || { shaderIndex: 0, paused: false };
+	// Get settings from store
+	$: shaderSettings = $settings.shader;
 	$: shaderIndex = shaderSettings.shaderIndex;
 	$: paused = shaderSettings.paused;
 

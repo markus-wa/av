@@ -9,8 +9,8 @@
 	let nSwitches: number = 0;
 	let paths = [pathABAB, pathCycleAB, pathAABBAABB, pathRandomSome, pathRandomAll];
 
-	// Get settings from store with defaults
-	$: matrixSettings = $settings.matrix || { pathIndex: 0, isManual: false };
+	// Get settings from store
+	$: matrixSettings = $settings.matrix;
 	$: pathIndex = matrixSettings.pathIndex;
 	$: isManual = matrixSettings.isManual;
 	let lastManualSwitchAt = new Date().getMilliseconds();

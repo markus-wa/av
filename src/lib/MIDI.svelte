@@ -13,8 +13,8 @@
 	let toggleState: { [key: number]: boolean } = {};
 	let lastMidiOutput: MIDIOutput | null = null;
 
-	// Get settings from store with defaults
-	$: midiSettings = $settings.midi || { stepSize: 8, selectedMidiIndex: 0, cc0: 63, cc1: 63, cc2: 63, cc3: 63 };
+	// Get settings from store
+	$: midiSettings = $settings.midi;
 	$: stepSize = midiSettings.stepSize;
 	$: selectedMidiIndex = midiSettings.selectedMidiIndex;
 	$: cc0 = midiSettings.cc0;

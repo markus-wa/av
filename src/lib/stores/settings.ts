@@ -95,8 +95,10 @@ function createPersistentStore<T>(key: string, startValue: T): Writable<T> {
 	return store;
 }
 
-// Main settings store
-export const settings = writable<AVSettings>(getStoredSettings());
+// Main settings store - always initialize with DEFAULT_SETTINGS
+// getStoredSettings() already merges stored values with defaults
+const initialSettings = getStoredSettings();
+export const settings = writable<AVSettings>(initialSettings);
 
 if (typeof window !== 'undefined') {
 	settings.subscribe(value => {
