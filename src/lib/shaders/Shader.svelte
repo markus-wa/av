@@ -16,6 +16,7 @@
 	import SwitchPro from '$lib/Controllers';
 	import { UniformsUtils } from 'three';
 	import { settings, updateShaderSettings } from '$lib/stores/settings';
+	import { debugMode } from '$lib/stores';
 
 	export let mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
 
@@ -47,12 +48,7 @@
 		updateShaderSettings({ paused });
 	}
 
-	// Toggle FPS display
-	export function toggleFpsDisplay(): void {
-		showFps = !showFps;
-	}
-
-	// Get current FPS
+	// Get current FPS (kept for external access if needed)
 	export function getFps(): number {
 		return fps;
 	}
@@ -174,9 +170,6 @@
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
 			updateShaderIndex(shaderIndex + 1);
-		} else if (buttonIndex == SwitchPro.HOME) {
-			if (!isPressed) return;
-			toggleFpsDisplay();
 		}
 	}
 
@@ -200,8 +193,10 @@
 	let fps: number = 0;
 	let frameCount: number = 0;
 	let lastFpsTime: number = 0;
-	let showFps: boolean = false;
 	let fpsStatus: 'high' | 'medium' | 'low' = 'high';
+	
+	// Sync with debug mode - FPS shows when debug is on
+	$: showFps = $debugMode;
 	
 	// Update FPS status
 	$: {
@@ -412,7 +407,6 @@
 	<div class="fps-counter" class:high-fps={fpsStatus === 'high'} class:medium-fps={fpsStatus === 'medium'} class:low-fps={fpsStatus === 'low'}>
 		<div class="fps-value">{fps}</div>
 		<div class="fps-label">FPS</div>
-		<button class="fps-toggle" on:click={toggleFpsDisplay}>Hide</button>
 	</div>
 {/if}
 
@@ -440,21 +434,6 @@
 		font-size: 12px;
 		opacity: 0.8;
 		margin-bottom: 5px;
-	}
-	
-	.fps-toggle {
-		background: rgba(255, 255, 255, 0.2);
-		color: white;
-		border: none;
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 11px;
-		cursor: pointer;
-		transition: background 0.2s;
-	}
-	
-	.fps-toggle:hover {
-		background: rgba(255, 255, 255, 0.3);
 	}
 	
 	.fps-counter.high-fps {

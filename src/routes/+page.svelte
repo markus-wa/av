@@ -6,6 +6,7 @@
 	import Shader from '$lib/shaders/Shader.svelte';
 	import SwitchPro from '$lib/Controllers';
 	import MatrixSwitcher from '$lib/matrix/MatrixSwitcher.svelte';
+	import { debugMode, toggleDebugMode } from '$lib/stores';
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
@@ -20,9 +21,10 @@
 	let controlledComponentIndex: number = 0;
 	let controlledComponents: ControlledComponent[];
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
-	let showToaster: boolean = false;
 	let rStickPressStart: number | null = null;
 	let paused = false;
+	
+	$: showToaster = $debugMode;
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log("Media changed:", element);
@@ -127,10 +129,10 @@
 			});
 
 			if (rStickPressStart !== null && performance.now() - rStickPressStart >= 3000) {
-				showToaster = !showToaster;
+				toggleDebugMode();
 				rStickPressStart = null;
 
-				toast(`Debug ${showToaster ? "ON" : "OFF"}`)
+				toast(`Debug ${$debugMode ? "ON" : "OFF"}`)
 			}
 
 			previousButtonStates = buttons.map(button => button.pressed);
