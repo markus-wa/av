@@ -155,6 +155,7 @@
 			});
 			window.addEventListener('gamepaddisconnected', () => {
 				console.log("Gamepad disconnected");
+				toast("Gamepad disconnected");
 				updateGamepadList();
 				processGamepadState();
 			});

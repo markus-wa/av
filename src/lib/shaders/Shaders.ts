@@ -1,6 +1,6 @@
 export interface Shader {
 	name: string;
-	uniforms: { [key: string]: { value: any } };
+	uniforms: { [key: string]: { value: any, min?: number, max?: number } };
 	vertexShader: string;
 	fragmentShader: string;
 }
@@ -10,10 +10,10 @@ export const CRT = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 0.05 }, // scanline density
-		p1: { value: 0.01 }, // scanline speed
-		p2: { value: 0.05 }, // scanline intensity
-		p3: { value: 0 } // colour tint
+		p0: { value: 0.1 }, // scanline density
+		p1: { value: 0 }, // scanline speed
+		p2: { value: 0.1 }, // scanline intensity
+		p3: { value: 1 } // colour tint
 	},
 	vertexShader: `
 			varying vec2 vUv;
@@ -30,7 +30,7 @@ export const CRT = {
 
 			void main() {
 				vec2 uv = vUv;
-				float scanline = sin(uv.y * (p0 * 2000.0) + time * (3.0 + p1 * 160.0)) * p2;
+				float scanline = sin(uv.y * (p0 * 2000.0) + time * 0.1 * (p1 - 0.5)) * p2;
 				vec4 color = texture2D(tDiffuse, uv);
 				color.rgb += scanline;
 				color.rgb *= vec3(1.0, 0.9 + p3 * 0.2, 0.8 - p3 * 0.2);
@@ -44,7 +44,7 @@ export const ColorGrading = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 1.0 }, // Contrast (0-1)
+		p0: { value: 1.0, min: 0.2 }, // Contrast (0-1)
 		p1: { value: 0.5 }, // Hue Shift (0-1)
 		p2: { value: 1.0 }, // Saturation (0-1)
 		p3: { value: 0.5 }  // Tint (0-1, neutral at 0.5)
@@ -280,10 +280,10 @@ export const Glitch = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 0.5 },   // Glitch amount (0-1)
-		p1: { value: 0.1 },   // Glitch speed (0-1)
-		p2: { value: 0.0 },   // Color offset intensity
-		p3: { value: 0.5 }    // Block glitch amount
+		p0: { value: 0.5 },   // Glitch intensity (0-1)
+		p1: { value: 0.5 },   // Glitch frequency (0-1)
+		p2: { value: 0.5 },   // Color chaos (0-1)
+		p3: { value: 0.3 }    // Block distortion (0-1)
 	},
 	vertexShader: `
 		varying vec2 vUv;
@@ -298,9 +298,24 @@ export const Glitch = {
 		uniform float time;
 		uniform float p0, p1, p2, p3;
 
-		// Random function
+		// Better pseudo-random with time variation
 		float rand(vec2 co) {
-			return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+			return fract(sin(dot(co.xy, vec2(12.9898, 78.233) + time * 0.1)) * 43758.5453);
+		}
+
+		// 2D noise for more organic patterns
+		float noise(vec2 st) {
+			vec2 i = floor(st);
+			vec2 f = fract(st);
+			
+			// Four corners in unit square
+			float a = rand(i);
+			float b = rand(i + vec2(1.0, 0.0));
+			float c = rand(i + vec2(0.0, 1.0));
+			float d = rand(i + vec2(1.0, 1.0));
+			
+			vec2 u = f * f * (3.0 - 2.0 * f);
+			return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 		}
 
 		void main() {
@@ -309,53 +324,265 @@ export const Glitch = {
 			// Base color
 			vec4 color = texture2D(tDiffuse, uv);
 			
-			// Calculate glitch effect based on time and randomness
-			float glitchAmount = p0 * 0.1;
-			float glitchSpeed = 0.5 + p1 * 2.0;
-			float timeFactor = sin(time * glitchSpeed) * 0.5 + 0.5;
+			// Global glitch parameters
+			float intensity = p0;
+			float frequency = 0.2 + p1 * 2.0;
+			float chaos = p2;
+			float blockDistort = p3;
+
+			// Time-based seed for randomness
+			float t = time * frequency;
 			
-			// RGB split - offset each channel differently
-			float offsetR = sin(time * 2.0 + p2) * glitchAmount * 0.02 * timeFactor;
-			float offsetG = sin(time * 1.5 + p2 * 0.5) * glitchAmount * 0.01 * timeFactor;
-			float offsetB = sin(time * 1.0 + p2 * 0.3) * glitchAmount * 0.03 * timeFactor;
+			// Create per-pixel random values that change over time
+			float seed = rand(uv + t);
 			
-			float r = texture2D(tDiffuse, uv + vec2(offsetR, 0.0)).r;
-			float g = texture2D(tDiffuse, uv + vec2(offsetG, 0.0)).g;
-			float b = texture2D(tDiffuse, uv + vec2(offsetB, 0.0)).b;
+			// RGB split with time-varying chaotic offsets
+			float offsetR = (rand(uv + t * 1.3) - 0.5) * 0.05 * intensity * (0.5 + chaos);
+			float offsetG = (rand(uv + t * 1.7) - 0.5) * 0.04 * intensity * (0.6 + chaos * 0.4);
+			float offsetB = (rand(uv + t * 2.1) - 0.5) * 0.06 * intensity * (0.4 + chaos * 0.6);
 			
-			// Block glitch effect - randomly sample blocks
-			vec4 blockColor = color;
-			if (p3 > 0.0) {
-				float blockSize = 0.05 * p3;
-				vec2 blockUV = floor(uv / blockSize) * blockSize;
+			// Also add vertical offsets for more distortion
+			float offsetRY = (rand(uv + t * 0.7) - 0.5) * 0.03 * intensity * chaos;
+			float offsetGY = (rand(uv + t * 1.1) - 0.5) * 0.02 * intensity * chaos;
+			float offsetBY = (rand(uv + t * 1.5) - 0.5) * 0.04 * intensity * chaos;
+			
+			// Sample each channel with different offsets
+			float r = texture2D(tDiffuse, uv + vec2(offsetR, offsetRY)).r;
+			float g = texture2D(tDiffuse, uv + vec2(offsetG, offsetGY)).g;
+			float b = texture2D(tDiffuse, uv + vec2(offsetB, offsetBY)).b;
+			
+			// Block distortion - random rectangular blocks that glitch
+			vec4 finalColor = vec4(r, g, b, 1.0);
+			
+			if (blockDistort > 0.0) {
+				// Divide screen into blocks of random size
+				float blockDensity = 3.0 + p1 * 20.0;
+				vec2 blockCoord = floor(uv * blockDensity);
 				
-				// Random block displacement
-				if (rand(blockUV + vec2(time)) < 0.1 * p3) {
-					float randomX = (rand(blockUV + vec2(time * 0.1)) - 0.5) * 0.1 * p3;
-					float randomY = (rand(blockUV + vec2(time * 0.1, 1.0)) - 0.5) * 0.1 * p3;
-					blockColor = texture2D(tDiffuse, uv + vec2(randomX, randomY));
+				// Add time-based randomness to block positions
+				float blockRand = rand(blockCoord + vec2(t * 0.3));
+				
+				// Occasionally create a glitch block
+				if (blockRand < 0.05 * blockDistort) {
+					// Random offset for this block
+					float blockOffsetX = (rand(blockCoord + vec2(t, 0.0)) - 0.5) * 0.2 * blockDistort;
+					float blockOffsetY = (rand(blockCoord + vec2(0.0, t)) - 0.5) * 0.2 * blockDistort;
+					
+					// Sample from a random position
+					vec2 glitchUV = uv + vec2(blockOffsetX, blockOffsetY);
+					vec4 glitchSample = texture2D(tDiffuse, glitchUV);
+					
+					// Mix with original
+					float mixAmount = 0.3 + rand(blockCoord + vec2(t * 0.5)) * 0.7;
+					finalColor = mix(finalColor, glitchSample, mixAmount * blockDistort);
+				}
+				
+				// Sometimes invert colors in a block
+				if (rand(blockCoord + vec2(t * 0.7)) < 0.02 * blockDistort) {
+					finalColor.rgb = 1.0 - finalColor.rgb;
+				}
+				
+				// Add scanline-like artifacts
+				if (rand(vec2(uv.x, t * 0.5)) < 0.03 * blockDistort) {
+					finalColor.rgb *= vec3(1.0, 0.7, 0.3) * (0.5 + 0.5 * sin(t * 10.0));
 				}
 			}
 			
-			// Mix RGB split with block glitch
-			color = vec4(r, g, b, 1.0);
-			color = mix(color, blockColor, p3);
-			
-			// Add some chromatic aberration at edges
+			// Add chromatic aberration at edges with time variation
 			vec2 center = vec2(0.5);
-			float edgeFactor = distance(uv, center);
-			edgeFactor = pow(edgeFactor, 2.0);
+			float distFromCenter = distance(uv, center);
+			float edgeBoost = smoothstep(0.3, 0.8, distFromCenter) * 2.0;
 			
-			color.r += offsetR * edgeFactor * 2.0;
-			color.g += offsetG * edgeFactor * 1.5;
-			color.b += offsetB * edgeFactor * 2.5;
+			finalColor.r += offsetR * edgeBoost * chaos * 0.5;
+			finalColor.g += offsetG * edgeBoost * chaos * 0.5;
+			finalColor.b += offsetB * edgeBoost * chaos * 0.5;
 			
-			gl_FragColor = color;
+			// Add subtle noise across the entire image
+			float globalNoise = (noise(uv * 5.0 + t * 0.2) - 0.5) * 0.05 * intensity * chaos;
+			finalColor.rgb += vec3(globalNoise);
+			
+			gl_FragColor = finalColor;
 		}
 	`
 };
 
 // Feedback / Mirror Effect
+export const NeonGrid = {
+	name: 'Neon Grid',
+	uniforms: {
+		tDiffuse: { value: null },
+		audioData: { value: new Float32Array(512) },
+		time: { value: 0.0 },
+		p0: { value: 0.5 },   // Perspective depth (0-1)
+		p1: { value: 0.5 },   // Neon intensity (0-1)
+		p2: { value: 0.5 },   // Rotation speed (0-1)
+		p3: { value: 0.5 }    // Color mode (0-1)
+	},
+	vertexShader: `
+		varying vec2 vUv;
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`,
+	fragmentShader: `
+		varying vec2 vUv;
+		uniform sampler2D tDiffuse;
+		uniform float audioData[512];
+		uniform float time;
+		uniform float p0, p1, p2, p3;
+
+		// Vaporwave synthwave color palettes
+		vec3 getNeonColor(float t, float intensity) {
+			float r, g, b;
+			
+			// Classic vaporwave: pink, teal, purple
+			float hue = fract(t * 0.1 + 0.5);
+			r = sin(hue * 6.28318 + 0.0) * 0.5 + 0.5;
+			g = sin(hue * 6.28318 + 2.094) * 0.5 + 0.5;
+			b = sin(hue * 6.28318 + 4.188) * 0.5 + 0.5;
+			
+			// Boost saturation and add glow
+			vec3 color = vec3(r, g, b);
+			float glow = pow(intensity, 1.5) * 2.0;
+			return color * (0.6 + glow);
+		}
+
+		// Audio analysis - weighted towards bass
+		float getAudioIntensity() {
+			float intensity = 0.0;
+			for(int i = 0; i < 16; i++) {
+				int binIndex = i * 4;
+				float dbValue = audioData[binIndex];
+				float normalizedValue = clamp((dbValue + 140.0) / 140.0, 0.0, 1.0);
+				intensity += normalizedValue * (1.0 - float(i) / 16.0);
+			}
+			intensity /= 16.0;
+			return pow(intensity * 2.0, 0.33);
+		}
+
+		// Random hash for grid variation
+		float hash(vec2 p) {
+			p = 50.0 * fract(p * 0.3183099 + vec2(0.71, 0.113));
+			return -1.0 + 2.0 * fract(p.x * p.y * (p.x + p.y));
+		}
+
+		// Noise for organic feel
+		float noise(vec2 st) {
+			vec2 i = floor(st);
+			vec2 f = fract(st);
+			vec2 u = f * f * (3.0 - 2.0 * f);
+			return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+			           mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+		}
+
+		void main() {
+			vec2 uv = vUv;
+			vec2 center = vec2(0.5);
+			
+			// Get base color from texture
+			vec4 baseColor = texture2D(tDiffuse, uv);
+			
+			// Calculate audio intensity
+			float audioIntensity = getAudioIntensity();
+			
+			// Map parameters
+			float depth = mix(0.1, 2.0, p0);
+			float neonIntensity = p1;
+			float rotationSpeed = p2;
+			float colorMode = p3;
+			
+			// Center coordinates
+			vec2 dir = uv - center;
+			
+			// Apply rotation based on time and audio
+			float rotation = time * rotationSpeed * 0.5 + audioIntensity * 0.2;
+			float s = sin(rotation);
+			float c = cos(rotation);
+			mat2 rot = mat2(c, -s, s, c);
+			vec2 rotatedDir = dir * rot;
+			
+			// Perspective projection - plane going outward
+			float perspective = 1.0 / (1.0 + length(rotatedDir) * depth);
+			vec2 perspectiveUV = rotatedDir * perspective * 0.5 + center;
+			
+			// Create grid lines radiating from center
+			// Use perspectiveUV for the grid so it follows the perspective
+			vec2 gridUV = perspectiveUV;
+			
+			// Grid spacing - increases with distance from center
+			float gridScale = mix(5.0, 20.0, p0) * perspective;
+			
+			// Grid lines
+			vec2 grid = gridUV * gridScale;
+			
+			// Create thicker grid lines with smooth edges
+			float lineWidth = mix(0.02, 0.08, 1.0 - p0 * 0.5) * (0.5 + audioIntensity * 0.5);
+			
+			// Vertical lines
+			float lineX = abs(fract(grid.x + 0.5) - 0.5);
+			float verticalLine = smoothstep(lineWidth, 0.0, lineX);
+			
+			// Horizontal lines
+			float lineY = abs(fract(grid.y + 0.5) - 0.5);
+			float horizontalLine = smoothstep(lineWidth, 0.0, lineY);
+			
+			// Combine - use max for grid effect
+			float gridPattern = max(verticalLine, horizontalLine);
+			
+			// Add radial lines from center (vaporware style)
+			float angle = atan(rotatedDir.y, rotatedDir.x) + time * 0.1;
+			float radialLines = 0.0;
+			float numRadialLines = mix(4.0, 16.0, p0);
+			for(int i = 0; i < 8; i++) {
+				float lineAngle = float(i) * 6.28318 / numRadialLines - rotation;
+				float angleDiff = abs(angle - lineAngle);
+				float minDiff = min(angleDiff, 6.28318 - angleDiff);
+				radialLines += smoothstep(0.1, 0.05, minDiff * numRadialLines) * 0.5;
+			}
+			
+			// Combine patterns
+			float neonMask = max(gridPattern, radialLines * 1.5);
+			
+			// Distance from center for glow effect
+			float distFromCenter = length(dir) * 2.0;
+			float centerGlow = smoothstep(0.3, 0.0, distFromCenter) * (0.5 + audioIntensity);
+			
+			// Get neon color based on position and time
+			float colorTime = time * 0.3 + length(rotatedDir) * 2.0 + audioIntensity * 10.0;
+			vec3 neonColor = getNeonColor(colorTime, neonIntensity);
+			
+			// Apply perspective distortion to color
+			neonColor *= perspective * 2.0;
+			
+			// Combine everything
+			vec3 gridGlow = neonColor * neonMask * neonIntensity * (1.0 + centerGlow);
+			
+			// Add horizon line (vaporware staple) - horizontal line at center
+			float horizon = smoothstep(0.02, 0.0, abs(rotatedDir.y)) * 2.0;
+			vec3 horizonColor = getNeonColor(time * 0.2, neonIntensity * 1.5);
+			horizonColor.b *= 2.0; // More blue in horizon
+			gridGlow += horizonColor * horizon * (0.3 + audioIntensity * 0.5);
+			
+			// Mix with base color
+			vec3 finalColor = mix(baseColor.rgb, gridGlow, neonIntensity);
+			
+			// Add fog/distance effect
+			float fog = perspective * 0.3;
+			finalColor = mix(finalColor, neonColor * 0.3, fog * neonIntensity);
+			
+			// Add subtle noise for texture
+			float n = noise(uv * 50.0 + time * 0.1) * 0.03 * audioIntensity;
+			finalColor += vec3(n);
+			
+			// Final brightness boost from audio
+			finalColor *= mix(1.0, 1.8, audioIntensity * neonIntensity);
+			
+			gl_FragColor = vec4(finalColor, baseColor.a);
+		}
+	`
+};
+
 export const Feedback = {
 	name: 'Feedback',
 	uniforms: {

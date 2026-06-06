@@ -9,6 +9,7 @@
 		EdgeDetection,
 		Feedback,
 		Glitch,
+		NeonGrid,
 		Pixelation,
 		WaveformRipple,
 		type Shader
@@ -17,6 +18,7 @@
 	import { UniformsUtils } from 'three';
 	import { settings, updateShaderSettings } from '$lib/stores/settings';
 	import { debugMode } from '$lib/stores';
+	import { toast } from 'svelte-french-toast';
 
 	export let mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
 
@@ -29,24 +31,21 @@
 	let stepper: Stepper;
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
-	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation, Glitch, Feedback];
+	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation, Glitch, Feedback, NeonGrid];
 
 	// Get settings from store
 	$: shaderSettings = $settings.shader;
 	$: shaderIndex = shaderSettings.shaderIndex;
 	$: paused = shaderSettings.paused;
+	$: shader = shaders[shaderIndex] ?? shaders[0];
 
-	$: {
-		if (shaderIndex < 0) shaderIndex = shaders.length - 1;
-		if (shaderIndex >= shaders.length) shaderIndex = 0;
-	}
-
-	$: shader = shaders[shaderIndex];
-
-	$: {
-		if (shader) {
-			console.log("Shader changed:", shaderIndex, shader.name);
-		}
+	// React ONLY when the shader identity changes, not on every pass.
+	let appliedShaderName: string | null = null;
+	$: if (shader && material && shader.name !== appliedShaderName) {
+		appliedShaderName = shader.name;
+		console.log("Shader changed:", shaderIndex, shader.name);
+		toast(`Shader: ${shader.name}`);
+		setShader(shader);
 	}
 
 	export function setPaused(p: boolean): void {
@@ -61,6 +60,8 @@
 
 	// Update store when settings change
 	function updateShaderIndex(newIndex: number) {
+		const len = shaders.length;
+		newIndex = ((newIndex % len) + len) % len; // wrap both directions
 		shaderIndex = newIndex;
 		updateShaderSettings({ shaderIndex });
 	}
@@ -148,19 +149,20 @@
 	function setShader(shader: Shader): void {
 		if (!material || !scene) return;
 
-		cleanupTexture();
+		const next = UniformsUtils.clone(shader.uniforms);
 
+		// Preserve live uniforms across shader swaps
+		next.tDiffuse = { value: texture };
+		if (material.uniforms.audioData) next.audioData = material.uniforms.audioData;
+		if (material.uniforms.time) next.time = { value: material.uniforms.time.value };
+		for (const k of ['p0', 'p1', 'p2', 'p3']) {
+			if (material.uniforms[k] && next[k]) next[k].value = material.uniforms[k].value;
+		}
+
+		material.uniforms = next;
 		material.fragmentShader = shader.fragmentShader;
 		material.vertexShader = shader.vertexShader;
-		material.uniforms = Object.assign(material.uniforms, UniformsUtils.clone(shader.uniforms));
-		material.uniforms.tDiffuse.value = texture;
 		material.needsUpdate = true;
-	}
-
-	$: {
-		if (shader) {
-			setShader(shader);
-		}
 	}
 
 	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
@@ -181,6 +183,20 @@
 
 	function handleParamsChanged(p0: number, p1: number, p2: number, p3: number) {
 		if (!material) return;
+
+		function clamp(v: number, min?: number, max?: number) {
+			if (min && v < min) return min;
+			if (max && v > max) return max;
+
+			return v;
+		}
+
+		p0 = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
+		p1 = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
+		p2 = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
+		p3 = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
+
+
 
 		if (material.uniforms.p0) material.uniforms.p0.value = p0;
 		if (material.uniforms.p1) material.uniforms.p1.value = p1;
@@ -277,7 +293,7 @@
 	}
 
 	function setupScene() {
-		if (!renderer || !scene || !camera || !material) return;
+		if (!renderer || !scene || !camera) return;
 
 		// Clean up existing mesh
 		if (mesh) {
@@ -313,6 +329,10 @@
 		renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.setPixelRatio(window.devicePixelRatio);
+		renderer.domElement.style.position = 'fixed';
+		renderer.domElement.style.top = '0';
+		renderer.domElement.style.left = '0';
+		renderer.domElement.style.zIndex = '0';
 		document.body.appendChild(renderer.domElement);
 
 		scene = new THREE.Scene();
@@ -363,31 +383,30 @@
 	});
 
 	$: materialInitialized = material !== null;
+	let appliedMediaElement: typeof mediaElement = null;
 
-	$: if (mediaElement && materialInitialized) {
-			console.log("Shader mediaElement changed:", mediaElement);
-			cleanupTexture();
-			
-			if (mediaElement instanceof HTMLVideoElement) {
-				texture = createTextureFromElement(mediaElement);
-			} else if (mediaElement instanceof HTMLImageElement) {
-				if (mediaElement.src.endsWith('.gif')) {
-					texture = new THREE.Texture();
-				} else {
-					texture = createTextureFromElement(mediaElement);
-					if (texture) {
-						texture.needsUpdate = true;
-					}
-				}
-			}
-			
-			if (texture && material) {
-				material.uniforms.tDiffuse.value = texture;
-				material.needsUpdate = true;
-			}
+	$: if (mediaElement && materialInitialized && mediaElement !== appliedMediaElement) {
+		appliedMediaElement = mediaElement;
+		cleanupTexture();
+
+		if (mediaElement instanceof HTMLVideoElement) {
+			texture = createTextureFromElement(mediaElement);
+		} else if (mediaElement instanceof HTMLImageElement) {
+			texture = mediaElement.src.endsWith('.gif')
+				? new THREE.Texture()
+				: createTextureFromElement(mediaElement);
+			if (texture) texture.needsUpdate = true;
 		}
 
+		if (texture && material) {
+			material.uniforms.tDiffuse.value = texture;
+			material.needsUpdate = true;
+		}
+	}
+
 	onDestroy(async () => {
+		console.log('Destroying Three.js scene')
+
 		// Remove resize listener
 		if (resizeHandler) {
 			window.removeEventListener('resize', resizeHandler);
