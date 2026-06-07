@@ -471,14 +471,14 @@ export const Glitch = {
 };
 
 export const NeonGrid = {
-	name: 'NeonGrid',
+	name: 'Neon Grid',
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
 		p0: { value: 0.001 }, // grid scale / perspective
 		p1: { value: 0.3 }, // scroll speed
 		p2: { value: 1.0 }, // vanishing point height
-		p3: { value: 1.0 } // neon glow intensity
+		p3: { value: 0.5 } // neon hue intensity
 	},
 	vertexShader: `
     varying vec2 vUv;
@@ -493,22 +493,26 @@ export const NeonGrid = {
     uniform float time;
     uniform float p0, p1, p2, p3;
 
-    const vec3 NEON_PINK   = vec3(1.0, 0.1, 0.85);
-    const vec3 NEON_PURPLE = vec3(0.45, 0.05, 0.6);
+    const vec3 NEON_PINK   = vec3(1.0, 0.4, 0.85);
+    const vec3 NEON_PURPLE = vec3(0.6, 0.4, 0.9);
 
     void main() {
       vec2 uv = vUv;
       float horizon = p2;
+      
+      // Get base color from texture
+      vec4 baseColor = texture2D(tDiffuse, uv);
 
       float depth = (horizon - uv.y);
       float persp = 1.0 / (depth + 0.04);
       float gx = (uv.x - 0.5) * persp * (4.0 + p0 * 8.0);
-      float gz = persp * (2.0 + p0 * 4.0) + time * p1 * 0.01;
+      float gz = persp * (2.0 + p0 * 4.0) + fract(time * 0.1) * p1 * 0.02;
       vec2 g = vec2(gx, gz);
 
       // distance to nearest line in each axis, in cells
       vec2 grids = abs(fract(g) - 0.5);
-      vec2 lineW = fwidth(g);
+      // Fixed line width instead of fwidth
+      vec2 lineW = vec2(0.015);
 
       // sharp line core
       vec2 core2 = 1.0 - smoothstep(vec2(0.0), lineW * 1.5, grids);
@@ -519,14 +523,14 @@ export const NeonGrid = {
       float glow = clamp(glow2.x + glow2.y, 0.0, 1.0);
 
       vec3 gcol = mix(NEON_PURPLE, NEON_PINK, clamp(uv.y / horizon, 0.0, 1.0));
-      // bright white-hot core, neon glow around it
-      vec3 outCol = gcol * glow + vec3(1.0) * core;
+      // Apply neon as subtle hue on grid, mix with base
+      float gridMask = core + glow * 0.5;
+      vec3 neonGlow = gcol * gridMask * p3 * 0.4;
+      
+      vec3 outCol = baseColor.rgb + neonGlow;
+      outCol = min(outCol, vec3(1.0));
 
-      // alpha: solid on the core, fading glow, nothing in between
-      float alpha = clamp(core + glow * (0.35 + p3 * 0.5), 0.0, 1.0);
-      alpha = pow(alpha, 1.3); // crush the faint midground so gaps stay clear
-
-      gl_FragColor = vec4(outCol, alpha);
+      gl_FragColor = vec4(outCol, 1.0);
     }
   `
 };
@@ -607,7 +611,7 @@ export const Feedback = {
 			
 			// Add time-based pulsing - use fract to prevent accumulation
 			float pulse = sin(fract(time * 0.1) * 20.0) * 0.5 + 0.5;
-			color.rgb *= mix(1.0, vec3(1.0, 0.8, 0.6), p0 * pulse * 0.3);
+			color.rgb *= mix(vec3(1.0), vec3(1.0, 0.8, 0.6), p0 * pulse * 0.3);
 			
 			gl_FragColor = color;
 		}
