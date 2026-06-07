@@ -30,13 +30,11 @@
 
 	// Update store when settings change
 	function updatePathIndex(newIndex: number) {
-		pathIndex = newIndex;
-		updateMatrixSettings({ pathIndex });
+		updateMatrixSettings({ pathIndex: newIndex });
 	}
 
 	function updateIsManual(newValue: boolean) {
-		isManual = newValue;
-		updateMatrixSettings({ isManual });
+		updateMatrixSettings({ isManual: newValue });
 	}
 
 	export function setPaused(paused: boolean): void {
@@ -100,13 +98,12 @@
 			await preparePath();
 			await onSwitch(true);
 			matrixSwitcherInterval = setInterval(onSwitchAuto, 5000);
-		} catch (error) {
+		} catch {
 			connectionStatus = 'error';
 		}
 	}
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	export function onAxesStateChange(_axes: ReadonlyArray<number>): void {}
+	export function onAxesStateChange(): void {}
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
 		if (buttonIndex == SwitchPro.LT) {

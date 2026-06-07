@@ -5,7 +5,7 @@
 
 /// <reference lib="webworker" />
 
-import { build, files, version } from '$service-worker';
+import { build, version } from '$service-worker';
 
 // Cache names
 const CACHE_NAME = `av-cache-${version}`;
@@ -42,7 +42,7 @@ const MAX_MEDIA_FILES = 100;
 // Type definitions for service worker events
 declare global {
 	interface ExtendableEvent extends Event {
-		waitUntil(f: Promise<any>): void;
+		waitUntil(f: Promise<unknown>): void;
 	}
 
 	interface FetchEvent extends Event {
@@ -51,13 +51,13 @@ declare global {
 	}
 
 	interface ExtendableMessageEvent extends Event {
-		data: any;
+		data: unknown;
 		source: MessageEventSource | null;
-		waitUntil(f: Promise<any>): void;
+		waitUntil(f: Promise<unknown>): void;
 	}
 
 	interface MessageEventSource {
-		postMessage(message: any): void;
+		postMessage(message: unknown): void;
 	}
 }
 

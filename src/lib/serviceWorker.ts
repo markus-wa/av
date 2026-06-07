@@ -3,7 +3,6 @@
  * Manages service worker registration and communication
  */
 
-let serviceWorker: ServiceWorker | null = null;
 let registration: ServiceWorkerRegistration | null = null;
 let isSubscribed = false;
 
@@ -122,7 +121,7 @@ function setupMessageChannel(): void {
 /**
  * Send a message to the service worker
  */
-export function sendMessageToServiceWorker(type: string, data?: any): void {
+export function sendMessageToServiceWorker(type: string, data?: Record<string, unknown>): void {
 	if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
 		console.warn('[Service Worker Client] No active service worker');
 		return;
@@ -160,7 +159,7 @@ export function precachePlaylists(): void {
 /**
  * Request cache statistics
  */
-export function getCacheStats(): Promise<any> {
+export function getCacheStats(): Promise<Record<string, unknown>> {
 	return new Promise((resolve) => {
 		const messageChannel = new MessageChannel();
 

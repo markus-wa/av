@@ -128,6 +128,8 @@
 						matrixSwitcherComponent?.setPaused(paused);
 						shaderComponent?.setPaused(paused);
 						handled = true;
+
+						toast(paused ? 'Paused' : 'Unpaused');
 					}
 
 					if (!handled) {

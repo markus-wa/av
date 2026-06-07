@@ -42,8 +42,7 @@
 
 	// Update store when settings change
 	function updateMode(newMode: number) {
-		mode = newMode;
-		updateVideoSettings({ mode });
+		updateVideoSettings({ mode: newMode });
 		// Handle media initialization directly within user gesture context
 		if (newMode === 0) {
 			cleanupMedia();
@@ -59,44 +58,37 @@
 	}
 
 	function updateLoop(newLoop: boolean) {
-		loopVideos = newLoop;
-		updateVideoSettings({ loopVideos });
-		toast(`Loop: ${loopVideos ? 'ON' : 'OFF'}`);
+		updateVideoSettings({ loopVideos: newLoop });
+		toast(`Loop: ${newLoop ? 'ON' : 'OFF'}`);
 	}
 
 	function updateShuffle(newShuffle: boolean) {
-		shuffle = newShuffle;
-		updateVideoSettings({ shuffle });
-		toast(`Shuffle: ${shuffle ? 'ON' : 'OFF'}`);
-		if (shuffle && playlist) {
+		updateVideoSettings({ shuffle: newShuffle });
+		toast(`Shuffle: ${newShuffle ? 'ON' : 'OFF'}`);
+		if (newShuffle && playlist) {
 			currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
 		}
 	}
 
 	function updateCut(newCut: boolean) {
-		cutVideo = newCut;
-		updateVideoSettings({ cutVideo });
-		toast(`Cut: ${cutVideo ? 'ON' : 'OFF'}`);
+		updateVideoSettings({ cutVideo: newCut });
+		toast(`Cut: ${newCut ? 'ON' : 'OFF'}`);
 	}
 
 	function updateNextMediaInterval(newInterval: number) {
-		nextMediaIntervalSec = newInterval;
-		updateVideoSettings({ nextMediaIntervalSec });
+		updateVideoSettings({ nextMediaIntervalSec: newInterval });
 	}
 
 	function updateDeviceIndex(newIndex: number) {
-		deviceIndex = newIndex;
-		updateVideoSettings({ deviceIndex });
+		updateVideoSettings({ deviceIndex: newIndex });
 	}
 
 	function updateMediaIndex(newIndex: number) {
-		mediaIndex = newIndex;
-		updateVideoSettings({ mediaIndex });
+		updateVideoSettings({ mediaIndex: newIndex });
 	}
 
 	function updatePlaylistIndex(newIndex: number) {
-		playlistIndex = newIndex;
-		updateVideoSettings({ playlistIndex });
+		updateVideoSettings({ playlistIndex: newIndex });
 	}
 
 	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
@@ -146,11 +138,18 @@
 	}
 
 	$: {
-		if (mode === 2 && media && !paused) {
-			if (media.url !== currentVideoUrl) {
-				currentVideoUrl = media.url;
-				cleanupMedia();
-				playMedia(media.url);
+		if (mode === 2 && media) {
+			if (paused) {
+				if (playlist?.pausedMedia) {
+					cleanupMedia();
+					playMedia(playlist.pausedMedia.url);
+				}
+			} else {
+				if (media.url !== currentVideoUrl) {
+					currentVideoUrl = media.url;
+					cleanupMedia();
+					playMedia(media.url);
+				}
 			}
 		}
 	}
@@ -159,10 +158,6 @@
 
 	export function setPaused(p: boolean): void {
 		paused = p;
-		if (playlist?.pausedMedia) {
-			cleanupMedia();
-			playMedia(playlist.pausedMedia.url);
-		}
 	}
 
 	// Generate a shuffled order using the Fisher-Yates algorithm

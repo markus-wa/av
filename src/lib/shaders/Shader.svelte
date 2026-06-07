@@ -59,8 +59,13 @@
 	}
 
 	export function setPaused(p: boolean): void {
-		paused = p;
-		updateShaderSettings({ paused });
+		const wasPaused = paused;
+
+		updateShaderSettings({ paused: p });
+
+		if (wasPaused && !p) {
+			animationFrameId = requestAnimationFrame(animate);
+		}
 	}
 
 	// Get current FPS (kept for external access if needed)
@@ -72,8 +77,7 @@
 	function updateShaderIndex(newIndex: number) {
 		const len = shaders.length;
 		newIndex = ((newIndex % len) + len) % len; // wrap both directions
-		shaderIndex = newIndex;
-		updateShaderSettings({ shaderIndex });
+		updateShaderSettings({ shaderIndex: newIndex });
 	}
 
 	function cleanupThreeJS() {
@@ -137,15 +141,16 @@
 		camera = null;
 	}
 
-	function cleanupAudio() {
+	async function cleanupAudio() {
 		if (audioStream) {
 			audioStream.getTracks().forEach((track) => track.stop());
 			audioStream = null;
 		}
 
 		if (audioContext) {
-			return audioContext.close().catch((e) => console.error('Error closing audio context:', e));
+			return await audioContext.close();
 		}
+
 		return Promise.resolve();
 	}
 
@@ -198,13 +203,13 @@
 			return v;
 		}
 
-		if (material.uniforms.p0)
+		if (material.uniforms.p0 !== undefined)
 			material.uniforms.p0.value = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
-		if (material.uniforms.p1)
+		if (material.uniforms.p1 !== undefined)
 			material.uniforms.p1.value = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
-		if (material.uniforms.p2)
+		if (material.uniforms.p2 !== undefined)
 			material.uniforms.p2.value = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
-		if (material.uniforms.p3)
+		if (material.uniforms.p3 !== undefined)
 			material.uniforms.p3.value = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
 	}
 
@@ -287,7 +292,7 @@
 		}
 
 		if (material?.uniforms.audioData && analyser && audioData) {
-			analyser.getFloatFrequencyData(audioData);
+			analyser.getFloatFrequencyData(audioData as Float32Array<ArrayBuffer>);
 			material.uniforms.audioData.value = audioData;
 		}
 		if (material?.uniforms.time) {
@@ -439,10 +444,10 @@
 <Stepper
 	bind:this={stepper}
 	onParamsChange={handleParamsChanged}
-	p0={shader?.uniforms.p0?.value || 0.5}
-	p1={shader?.uniforms.p1?.value || 0.5}
-	p2={shader?.uniforms.p2?.value || 0.5}
-	p3={shader?.uniforms.p3?.value || 0.5}
+	p0={shader?.uniforms.p0?.value !== undefined ? shader.uniforms.p0.value : 0.5}
+	p1={shader?.uniforms.p1?.value !== undefined ? shader.uniforms.p1.value : 0.5}
+	p2={shader?.uniforms.p2?.value !== undefined ? shader.uniforms.p2.value : 0.5}
+	p3={shader?.uniforms.p3?.value !== undefined ? shader.uniforms.p3.value : 0.5}
 />
 
 {#if showFps}

@@ -11,9 +11,9 @@ export const CRT = {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
 		p0: { value: 0.1 }, // scanline density
-		p1: { value: 0 }, // scanline speed
+		p1: { value: 0.0 }, // scanline speed
 		p2: { value: 0.1 }, // scanline intensity
-		p3: { value: 1 } // colour tint
+		p3: { value: 1.0 } // colour tint
 	},
 	vertexShader: `
 			varying vec2 vUv;
@@ -478,7 +478,7 @@ export const NeonGrid = {
 		p0: { value: 0.001 }, // grid scale / perspective
 		p1: { value: 0.3 }, // scroll speed
 		p2: { value: 1.0 }, // vanishing point height
-		p3: { value: 0.5 } // neon hue intensity
+		p3: { value: 1.0 } // neon hue intensity
 	},
 	vertexShader: `
     varying vec2 vUv;
@@ -506,7 +506,7 @@ export const NeonGrid = {
       float depth = (horizon - uv.y);
       float persp = 1.0 / (depth + 0.04);
       float gx = (uv.x - 0.5) * persp * (4.0 + p0 * 8.0);
-      float gz = persp * (2.0 + p0 * 4.0) + fract(time * 0.1) * p1 * 0.02;
+      float gz = persp * (2.0 + p0 * 4.0) + time * p1 * 0.008;
       vec2 g = vec2(gx, gz);
 
       // distance to nearest line in each axis, in cells
@@ -524,8 +524,8 @@ export const NeonGrid = {
 
       vec3 gcol = mix(NEON_PURPLE, NEON_PINK, clamp(uv.y / horizon, 0.0, 1.0));
       // Apply neon as subtle hue on grid, mix with base
-      float gridMask = core + glow * 0.5;
-      vec3 neonGlow = gcol * gridMask * p3 * 0.4;
+      float gridMask = core + glow * 0.4;
+      vec3 neonGlow = gcol * gridMask * p3 * 0.7;
       
       vec3 outCol = baseColor.rgb + neonGlow;
       outCol = min(outCol, vec3(1.0));

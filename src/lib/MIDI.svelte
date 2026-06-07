@@ -42,21 +42,15 @@
 
 	// Update store when settings change
 	function updateStepSize(newSize: number) {
-		stepSize = newSize;
-		updateMidiSettings({ stepSize });
+		updateMidiSettings({ stepSize: newSize });
 	}
 
 	function updateSelectedMidiIndex(newIndex: number) {
-		selectedMidiIndex = newIndex;
-		updateMidiSettings({ selectedMidiIndex });
+		updateMidiSettings({ selectedMidiIndex: newIndex });
 	}
 
 	function updateCCValues(c0: number, c1: number, c2: number, c3: number) {
-		cc0 = c0;
-		cc1 = c1;
-		cc2 = c2;
-		cc3 = c3;
-		updateMidiSettings({ cc0, cc1, cc2, cc3 });
+		updateMidiSettings({ cc0: c0, cc1: c1, cc2: c2, cc3: c3 });
 	}
 
 	async function initMIDI(): Promise<void> {
@@ -70,7 +64,7 @@
 			midiAccess = await navigator.requestMIDIAccess();
 
 			// Listen for MIDI device changes
-			midiAccess.onstatechange = (event: WebMidi.MIDIConnectionEvent) => {
+			midiAccess.onstatechange = (event: Event) => {
 				console.log('MIDI device state change:', event);
 				// Re-initialize outputs when devices change
 				midiOutputs = Array.from(midiAccess!.outputs.values());
@@ -100,13 +94,13 @@
 				lastMidiOutput = midiOutput;
 			} else {
 				// Fallback to CH345 or first device
-				selectedMidiIndex = Math.max(
+				const newIndex = Math.max(
 					midiOutputs.findIndex((output) => output.name?.includes('CH345')),
 					0
 				);
-				updateSelectedMidiIndex(selectedMidiIndex);
+				updateSelectedMidiIndex(newIndex);
 				if (midiOutputs.length > 0) {
-					midiOutput = midiOutputs[selectedMidiIndex];
+					midiOutput = midiOutputs[newIndex];
 					lastMidiOutput = midiOutput;
 				}
 			}

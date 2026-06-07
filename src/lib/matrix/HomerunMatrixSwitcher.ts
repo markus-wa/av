@@ -1,6 +1,18 @@
-type SerialPort = any;
-type ReadableStreamDefaultReader<T> = any;
-type WritableStreamDefaultWriter<T> = any;
+// Type definitions for Web Serial API
+type SerialPort = {
+	readable: ReadableStream<Uint8Array> | null;
+	writable: WritableStream<Uint8Array> | null;
+	open(options: SerialOptions): Promise<void>;
+	close(): Promise<void>;
+};
+
+type SerialOptions = {
+	baudRate: number;
+	dataBits: number;
+	stopBits: number;
+	parity: 'none' | 'even' | 'odd';
+	flowControl: 'none' | 'hardware';
+};
 
 /**
  * HOMERUN Series Matrix Switcher Web Serial API
