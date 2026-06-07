@@ -1,6 +1,6 @@
 export interface Shader {
 	name: string;
-	uniforms: { [key: string]: { value: any, min?: number, max?: number } };
+	uniforms: { [key: string]: { value: any; min?: number; max?: number } };
 	vertexShader: string;
 	fragmentShader: string;
 }
@@ -37,7 +37,7 @@ export const CRT = {
 				gl_FragColor = color;
 			}
 		`
-}
+};
 
 export const ColorGrading = {
 	name: 'ColorGrading',
@@ -47,7 +47,7 @@ export const ColorGrading = {
 		p0: { value: 0.0 }, // Contrast (0=none, 1=max)
 		p1: { value: 0.0 }, // Hue Shift (0=none, 1=max)
 		p2: { value: 0.0 }, // Saturation (0=none, 1=max)
-		p3: { value: 0.0 }  // Tint (0=none, 1=max)
+		p3: { value: 0.0 } // Tint (0=none, 1=max)
 	},
 	vertexShader: `
 			varying vec2 vUv;
@@ -285,10 +285,10 @@ export const Glitch = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 0.5 },   // RGB Split Intensity (0-1)
-		p1: { value: 0.5 },   // Block Glitch Frequency (0-1)
-		p2: { value: 0.5 },   // Color Chaos / Noise (0-1)
-		p3: { value: 0.5 }    // Scanline / Artifact Intensity (0-1)
+		p0: { value: 0.5 }, // RGB Split Intensity (0-1)
+		p1: { value: 0.5 }, // Block Glitch Frequency (0-1)
+		p2: { value: 0.5 }, // Color Chaos / Noise (0-1)
+		p3: { value: 0.5 } // Scanline / Artifact Intensity (0-1)
 	},
 	vertexShader: `
 		varying vec2 vUv;
@@ -540,10 +540,10 @@ export const Feedback = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 0.5 },   // Feedback amount (0-1)
-		p1: { value: 0.5 },   // Zoom factor
-		p2: { value: 0.0 },   // Rotation angle
-		p3: { value: 0.5 }    // Distortion amount
+		p0: { value: 0.5 }, // Feedback amount (0-1)
+		p1: { value: 0.5 }, // Zoom factor
+		p2: { value: 0.0 }, // Rotation angle
+		p3: { value: 0.5 } // Distortion amount
 	},
 	vertexShader: `
 		varying vec2 vUv;

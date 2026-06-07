@@ -10,7 +10,7 @@
 
 	let animationFrame: number;
 	let previousButtonStates: boolean[] = [];
-	let axesState: ReadonlyArray<number> = [0,0,0,0];
+	let axesState: ReadonlyArray<number> = [0, 0, 0, 0];
 	let selectedGamepadIndex: number = 0;
 	let gamepadsList: Gamepad[] = [];
 	let videoComponent: Video;
@@ -23,11 +23,11 @@
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let rStickPressStart: number | null = null;
 	let paused = false;
-	
+
 	$: showToaster = $debugMode;
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
-		console.log("Media changed:", element);
+		console.log('Media changed:', element);
 		mediaElement = element;
 	}
 
@@ -36,7 +36,12 @@
 		onButtonStateChange(buttonIndex: number, isPressed: boolean): void;
 	}
 
-	$: controlledComponents = [videoComponent, midiComponent, shaderComponent, matrixSwitcherComponent];
+	$: controlledComponents = [
+		videoComponent,
+		midiComponent,
+		shaderComponent,
+		matrixSwitcherComponent
+	];
 	$: controlledComponent = controlledComponents[controlledComponentIndex];
 	$: gamepad = gamepadsList[selectedGamepadIndex];
 
@@ -50,20 +55,20 @@
 
 	$: {
 		if (controlledComponent === videoComponent) {
-			toast("Mode: Video");
+			toast('Mode: Video');
 		} else if (controlledComponent === midiComponent) {
-			toast("Mode: MIDI");
+			toast('Mode: MIDI');
 		} else if (controlledComponent === shaderComponent) {
-			toast("Mode: Shader");
+			toast('Mode: Shader');
 		} else if (controlledComponent === matrixSwitcherComponent) {
-			toast("Mode: Matrix Switcher");
+			toast('Mode: Matrix Switcher');
 		}
 	}
 
 	function updateGamepadList(): void {
 		const gamepads = navigator.getGamepads();
 		gamepadsList = Array.from(gamepads).filter((gp): gp is Gamepad => gp !== null && gp.connected);
-		console.log("Gamepads:", gamepadsList);
+		console.log('Gamepads:', gamepadsList);
 	}
 
 	function processGamepadState(): void {
@@ -74,7 +79,10 @@
 
 			buttons.forEach(({ index, pressed }) => {
 				if (previousButtonStates[index] !== pressed) {
-					console.log(`Button ${index} changed to ${pressed ? 'PRESSED' : 'RELEASED'}`, gamepad.buttons);
+					console.log(
+						`Button ${index} changed to ${pressed ? 'PRESSED' : 'RELEASED'}`,
+						gamepad.buttons
+					);
 
 					let handled = false;
 
@@ -98,7 +106,7 @@
 						} else if (index === SwitchPro.D_RIGHT) {
 							controlledComponentIndex = 2;
 							handled = true;
-						}else if (index === SwitchPro.D_DOWN) {
+						} else if (index === SwitchPro.D_DOWN) {
 							controlledComponentIndex = 3;
 							handled = true;
 						}
@@ -116,9 +124,9 @@
 						if (!pressed) return;
 
 						paused = !paused;
-						videoComponent?.setPaused(paused)
-						matrixSwitcherComponent?.setPaused(paused)
-						shaderComponent?.setPaused(paused)
+						videoComponent?.setPaused(paused);
+						matrixSwitcherComponent?.setPaused(paused);
+						shaderComponent?.setPaused(paused);
 						handled = true;
 					}
 
@@ -132,10 +140,10 @@
 				toggleDebugMode();
 				rStickPressStart = null;
 
-				toast(`Debug ${$debugMode ? "ON" : "OFF"}`)
+				toast(`Debug ${$debugMode ? 'ON' : 'OFF'}`);
 			}
 
-			previousButtonStates = buttons.map(button => button.pressed);
+			previousButtonStates = buttons.map((button) => button.pressed);
 			if (axesState !== gamepad.axes) {
 				controlledComponent?.onAxesStateChange(axesState);
 			}
@@ -154,8 +162,8 @@
 				processGamepadState();
 			});
 			window.addEventListener('gamepaddisconnected', () => {
-				console.log("Gamepad disconnected");
-				toast("Gamepad disconnected");
+				console.log('Gamepad disconnected');
+				toast('Gamepad disconnected');
 				updateGamepadList();
 				processGamepadState();
 			});
@@ -167,14 +175,14 @@
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('gamepadconnected', processGamepadState);
-			window.removeEventListener('gamepaddisconnected', () => console.log("Gamepad disconnected"));
+			window.removeEventListener('gamepaddisconnected', () => console.log('Gamepad disconnected'));
 			cancelAnimationFrame(animationFrame);
 		}
 	});
 </script>
 
 <MIDI bind:this={midiComponent} />
-<Video bind:this={videoComponent} onMediaChange={handleMediaChange}/>
-<Shader bind:this={shaderComponent} mediaElement={mediaElement}/>
+<Video bind:this={videoComponent} onMediaChange={handleMediaChange} />
+<Shader bind:this={shaderComponent} {mediaElement} />
 <MatrixSwitcher bind:this={matrixSwitcherComponent} />
-<Toaster containerStyle={showToaster ? "display: block;" : "display: none;"} />
+<Toaster containerStyle={showToaster ? 'display: block;' : 'display: none;'} />

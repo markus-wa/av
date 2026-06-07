@@ -1,4 +1,4 @@
-const  SwitchPro = {
+const SwitchPro = {
 	B: 0,
 	A: 1,
 	Y: 2,
@@ -16,7 +16,7 @@ const  SwitchPro = {
 	D_LEFT: 14,
 	D_RIGHT: 15,
 	HOME: 16,
-	SCREENSHOT: 17,
-}
+	SCREENSHOT: 17
+};
 
 export default SwitchPro;

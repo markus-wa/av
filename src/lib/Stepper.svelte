@@ -7,12 +7,12 @@
 	export let [p0, p1, p2, p3] = [0.5, 0.5, 0.5, 0.5];
 	export let onParamsChange: (p0: number, p1: number, p2: number, p3: number) => void;
 
-	let axesState: ReadonlyArray<number> = [0,0,0,0];
+	let axesState: ReadonlyArray<number> = [0, 0, 0, 0];
 	let paramInterval: ReturnType<typeof setInterval>;
 
 	$: {
 		onParamsChange(p0, p1, p2, p3);
-		console.log("Params:", p0, p1, p2, p3);
+		console.log('Params:', p0, p1, p2, p3);
 	}
 
 	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
@@ -27,7 +27,7 @@
 		}
 
 		stepSize = v;
-		console.log("stepSize:", stepSize);
+		console.log('stepSize:', stepSize);
 	}
 
 	function incStepSize(): void {
@@ -95,5 +95,4 @@
 			clearInterval(paramInterval);
 		}
 	});
-
 </script>

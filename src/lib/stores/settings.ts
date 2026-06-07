@@ -66,7 +66,7 @@ const STORAGE_KEY = 'av-settings';
 
 function getStoredSettings(): AVSettings {
 	if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-	
+
 	try {
 		const stored = localStorage.getItem(STORAGE_KEY);
 		if (stored) {
@@ -81,9 +81,9 @@ function getStoredSettings(): AVSettings {
 function createPersistentStore<T>(key: string, startValue: T): Writable<T> {
 	const stored = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
 	const store = writable(stored ? JSON.parse(stored) : startValue);
-	
+
 	if (typeof window !== 'undefined') {
-		store.subscribe(value => {
+		store.subscribe((value) => {
 			try {
 				localStorage.setItem(key, JSON.stringify(value));
 			} catch (error) {
@@ -91,7 +91,7 @@ function createPersistentStore<T>(key: string, startValue: T): Writable<T> {
 			}
 		});
 	}
-	
+
 	return store;
 }
 
@@ -101,7 +101,7 @@ const initialSettings = getStoredSettings();
 export const settings = writable<AVSettings>(initialSettings);
 
 if (typeof window !== 'undefined') {
-	settings.subscribe(value => {
+	settings.subscribe((value) => {
 		try {
 			localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
 		} catch (error) {
@@ -112,28 +112,28 @@ if (typeof window !== 'undefined') {
 
 // Helper functions to update settings
 export function updateVideoSettings(updates: Partial<AVSettings['video']>) {
-	settings.update(s => ({
+	settings.update((s) => ({
 		...s,
 		video: { ...s.video, ...updates }
 	}));
 }
 
 export function updateMidiSettings(updates: Partial<AVSettings['midi']>) {
-	settings.update(s => ({
+	settings.update((s) => ({
 		...s,
 		midi: { ...s.midi, ...updates }
 	}));
 }
 
 export function updateShaderSettings(updates: Partial<AVSettings['shader']>) {
-	settings.update(s => ({
+	settings.update((s) => ({
 		...s,
 		shader: { ...s.shader, ...updates }
 	}));
 }
 
 export function updateMatrixSettings(updates: Partial<AVSettings['matrix']>) {
-	settings.update(s => ({
+	settings.update((s) => ({
 		...s,
 		matrix: { ...s.matrix, ...updates }
 	}));
@@ -146,7 +146,16 @@ export function resetSettings(): void {
 
 // Individual stores for convenience (also persisted)
 export const videoMode = createPersistentStore<number>('video-mode', DEFAULT_SETTINGS.video.mode);
-export const loopVideos = createPersistentStore<boolean>('loop-videos', DEFAULT_SETTINGS.video.loopVideos);
+export const loopVideos = createPersistentStore<boolean>(
+	'loop-videos',
+	DEFAULT_SETTINGS.video.loopVideos
+);
 export const shuffle = createPersistentStore<boolean>('shuffle', DEFAULT_SETTINGS.video.shuffle);
-export const cutVideo = createPersistentStore<boolean>('cut-video', DEFAULT_SETTINGS.video.cutVideo);
-export const nextMediaIntervalSec = createPersistentStore<number>('next-media-interval', DEFAULT_SETTINGS.video.nextMediaIntervalSec);
+export const cutVideo = createPersistentStore<boolean>(
+	'cut-video',
+	DEFAULT_SETTINGS.video.cutVideo
+);
+export const nextMediaIntervalSec = createPersistentStore<number>(
+	'next-media-interval',
+	DEFAULT_SETTINGS.video.nextMediaIntervalSec
+);

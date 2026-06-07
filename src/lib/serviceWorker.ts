@@ -18,9 +18,11 @@ export async function registerServiceWorker(): Promise<void> {
 
 	try {
 		// Only register on HTTPS or localhost
-		if (window.location.protocol !== 'https:' && 
-			window.location.hostname !== 'localhost' && 
-			window.location.hostname !== '127.0.0.1') {
+		if (
+			window.location.protocol !== 'https:' &&
+			window.location.hostname !== 'localhost' &&
+			window.location.hostname !== '127.0.0.1'
+		) {
 			console.warn('Service Worker registration skipped (not HTTPS or localhost)');
 			return;
 		}
@@ -29,9 +31,12 @@ export async function registerServiceWorker(): Promise<void> {
 		const existingRegistration = await navigator.serviceWorker.getRegistration();
 		if (existingRegistration) {
 			registration = existingRegistration;
-			serviceWorker = existingRegistration.active || existingRegistration.waiting || existingRegistration.installing;
+			serviceWorker =
+				existingRegistration.active ||
+				existingRegistration.waiting ||
+				existingRegistration.installing;
 			console.log('[Service Worker Client] Using existing registration');
-			
+
 			// Subscribe to updates
 			subscribeToUpdates(existingRegistration);
 			return;
@@ -43,13 +48,12 @@ export async function registerServiceWorker(): Promise<void> {
 		});
 
 		console.log('[Service Worker Client] Registered service worker');
-		
+
 		// Subscribe to updates
 		subscribeToUpdates(registration);
-		
+
 		// Set up message channel
 		setupMessageChannel();
-		
 	} catch (error) {
 		console.error('[Service Worker Client] Registration failed:', error);
 	}
@@ -71,14 +75,14 @@ function subscribeToUpdates(reg: ServiceWorkerRegistration): void {
 		newWorker.onstatechange = () => {
 			if (newWorker.state === 'installed') {
 				console.log('[Service Worker Client] New service worker installed');
-				
+
 				// Check for waiting state (user needs to refresh)
 				if (navigator.serviceWorker.controller) {
 					console.log('[Service Worker Client] New version available - refresh to update');
 					// You could show a toast here: "New version available - refresh to update"
 				}
 			}
-			
+
 			if (newWorker.state === 'activated') {
 				console.log('[Service Worker Client] New service worker activated');
 				serviceWorker = newWorker;
@@ -96,19 +100,19 @@ function setupMessageChannel(): void {
 	if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
 
 	const messageChannel = new MessageChannel();
-	
+
 	messageChannel.port1.onmessage = (event) => {
 		console.log('[Service Worker Client] Message from service worker:', event.data);
-		
+
 		if (event.data.type === 'CACHE_STATS') {
 			console.log('Cache stats:', event.data.data);
 		}
 	};
-	
+
 	// Listen for messages from service worker
 	navigator.serviceWorker.addEventListener('message', (event) => {
 		console.log('[Service Worker Client] Direct message from service worker:', event.data);
-		
+
 		if (event.data.type === 'CACHE_STATS') {
 			console.log('Cache stats:', event.data.data);
 		}
@@ -159,17 +163,16 @@ export function precachePlaylists(): void {
 export function getCacheStats(): Promise<any> {
 	return new Promise((resolve) => {
 		const messageChannel = new MessageChannel();
-		
+
 		messageChannel.port1.onmessage = (event) => {
 			if (event.data.type === 'CACHE_STATS') {
 				resolve(event.data.data);
 			}
 		};
-		
-		navigator.serviceWorker.controller?.postMessage(
-			{ type: 'GET_CACHE_STATS' },
-			[messageChannel.port2]
-		);
+
+		navigator.serviceWorker.controller?.postMessage({ type: 'GET_CACHE_STATS' }, [
+			messageChannel.port2
+		]);
 	});
 }
 
@@ -205,7 +208,7 @@ export async function unregisterServiceWorker(): Promise<void> {
 export function initServiceWorker(): void {
 	// Register service worker after a small delay to avoid blocking page load
 	setTimeout(() => {
-		registerServiceWorker().catch(error => {
+		registerServiceWorker().catch((error) => {
 			console.error('[Service Worker Client] Initialization failed:', error);
 		});
 	}, 1000);

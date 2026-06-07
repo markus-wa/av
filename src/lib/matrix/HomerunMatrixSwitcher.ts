@@ -41,7 +41,7 @@ export class HomerunMatrixSwitcher {
 
 	// Default configuration matching manual specifications
 	private config: SerialConfig = {
-		baudRate: 2400,  // Factory default
+		baudRate: 2400, // Factory default
 		dataBits: 8,
 		stopBits: 1,
 		parity: 'none',
@@ -84,7 +84,6 @@ export class HomerunMatrixSwitcher {
 			this.isConnected = true;
 			this.reconnectAttempts = 0;
 			console.log('Connected to HOMERUN Matrix Switcher');
-
 		} catch (error) {
 			// Clean up partial connection
 			this.isConnected = false;
@@ -111,24 +110,23 @@ export class HomerunMatrixSwitcher {
 			// Need user gesture for requestPort, so this should be called from a click handler
 			this.reconnectAttempts++;
 			console.log(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
-			
+
 			// Clear existing resources
 			this.clearReconnect();
-			
+
 			// Try to connect
 			const finalConfig = { ...this.config, ...config };
 			this.port = await navigator.serial.requestPort();
 			this.lastConnectTime = Date.now();
 			await this.port.open(finalConfig);
-			
+
 			this.reader = this.port.readable?.getReader() || null;
 			this.writer = this.port.writable?.getWriter() || null;
-			
+
 			this.isConnected = true;
 			this.reconnectAttempts = 0;
 			console.log('Reconnected to HOMERUN Matrix Switcher');
 			return true;
-			
 		} catch (error) {
 			console.error(`Reconnection attempt ${this.reconnectAttempts} failed:`, error);
 			this.isConnected = false;
@@ -159,7 +157,7 @@ export class HomerunMatrixSwitcher {
 	 */
 	async disconnect(): Promise<void> {
 		this.clearReconnect();
-		
+
 		if (this.reader) {
 			try {
 				await this.reader.cancel();
@@ -246,20 +244,21 @@ export class HomerunMatrixSwitcher {
 	private shouldAddFeedback(command: string): boolean {
 		// Commands that don't support feedback (per manual)
 		const noFeedbackCommands = [
-			'VERN',  // Version command has no feedback but returns version
+			'VERN', // Version command has no feedback but returns version
 			'IXXOXXX', // Status commands return data directly
 			'IXXO', // Input status commands
-			'OXXX', // Output status commands
+			'OXXX' // Output status commands
 		];
 
 		// Check if command is in no-feedback list
-		const isNoFeedbackCommand = noFeedbackCommands.some(cmd => command.includes(cmd));
+		const isNoFeedbackCommand = noFeedbackCommands.some((cmd) => command.includes(cmd));
 
 		// Commands that already end with F
 		const alreadyHasFeedback = command.endsWith('F');
 
 		// Programming commands that support feedback
-		const isProgrammingCommand = command.includes('SETID') ||
+		const isProgrammingCommand =
+			command.includes('SETID') ||
 			command.includes('BAUD') ||
 			command.includes('CODE') ||
 			command.includes('S]') ||
@@ -267,20 +266,23 @@ export class HomerunMatrixSwitcher {
 			command.includes('L]');
 
 		// Control commands that support feedback
-		const isControlCommand = command.includes('I') && command.includes('O') &&
-			!command.includes('XXX'); // Exclude status commands
+		const isControlCommand =
+			command.includes('I') && command.includes('O') && !command.includes('XXX'); // Exclude status commands
 
 		// System commands that support feedback
-		const isSystemCommand = command.includes('RSET') ||
+		const isSystemCommand =
+			command.includes('RSET') ||
 			command.includes('SAV') ||
 			command.includes('RCL') ||
 			command.includes('SW') ||
 			command.includes('UID') ||
 			command.includes('VIS');
 
-		return !isNoFeedbackCommand &&
+		return (
+			!isNoFeedbackCommand &&
 			!alreadyHasFeedback &&
-			(isProgrammingCommand || isControlCommand || isSystemCommand);
+			(isProgrammingCommand || isControlCommand || isSystemCommand)
+		);
 	}
 
 	/**
@@ -354,7 +356,6 @@ export class HomerunMatrixSwitcher {
 				if (attempts < maxAttempts) {
 					await this.sleep(100); // Short delay before retry
 				}
-
 			} catch (error) {
 				if (attempts === maxAttempts - 1) {
 					throw new Error(`Failed to read response after ${maxAttempts} attempts: ${error}`);
@@ -395,7 +396,7 @@ export class HomerunMatrixSwitcher {
 	 * Utility function for delays
 	 */
 	private sleep(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	// CONTROL COMMANDS
@@ -711,7 +712,7 @@ export class HomerunSwitcherExample {
 			if (!isConnected) {
 				console.error('Connection test failed');
 
-				return
+				return;
 			}
 
 			// Get version info
@@ -745,7 +746,6 @@ export class HomerunSwitcherExample {
 
 			// Disconnect when done
 			await this.switcher.disconnect();
-
 		} catch (error) {
 			console.error('Error:', error);
 		}

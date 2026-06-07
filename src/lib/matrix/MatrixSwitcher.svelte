@@ -3,7 +3,13 @@
 	import { browser } from '$app/environment';
 	import HomerunMatrixSwitcher from '$lib/matrix/HomerunMatrixSwitcher';
 	import SwitchPro from '$lib/Controllers';
-	import { pathAABBAABB, pathABAB, pathCycleAB, pathRandomAll, pathRandomSome } from '$lib/matrix/Paths';
+	import {
+		pathAABBAABB,
+		pathABAB,
+		pathCycleAB,
+		pathRandomAll,
+		pathRandomSome
+	} from '$lib/matrix/Paths';
 	import { settings, updateMatrixSettings } from '$lib/stores/settings';
 
 	let matrixSwitcher: HomerunMatrixSwitcher = new HomerunMatrixSwitcher();
@@ -87,7 +93,7 @@
 	async function connectSerial() {
 		connectionStatus = 'connecting';
 		try {
-			await matrixSwitcher.connect({baudRate: 9600});
+			await matrixSwitcher.connect({ baudRate: 9600 });
 			connectionStatus = 'connected';
 			startHideTimer();
 			clearInterval(matrixSwitcherInterval);
@@ -117,14 +123,14 @@
 			if (pathIndex < 0) {
 				updatePathIndex(paths.length - 1);
 			}
-			console.log("Selected path:", pathIndex);
+			console.log('Selected path:', pathIndex);
 		} else if (buttonIndex == SwitchPro.RT2) {
 			if (!isPressed) return;
 			updatePathIndex(pathIndex + 1);
 			if (pathIndex >= paths.length) {
 				updatePathIndex(0);
 			}
-			console.log("Selected path:", pathIndex);
+			console.log('Selected path:', pathIndex);
 		} else if (buttonIndex == SwitchPro.A) {
 			if (!isPressed) return;
 			updateIsManual(!isManual);
@@ -182,7 +188,7 @@
 						Connect Serial Port
 					{/if}
 				</button>
-				<button class="close-button" on:click={() => showModal = false}>×</button>
+				<button class="close-button" on:click={() => (showModal = false)}>×</button>
 			</div>
 		</div>
 	</div>
@@ -239,23 +245,23 @@
 	}
 
 	.serial-modal-content .connected {
-		color: #4CAF50;
+		color: #4caf50;
 	}
 
 	.serial-modal-content .connecting {
-		color: #FFC107;
+		color: #ffc107;
 	}
 
 	.serial-modal-content .error {
-		color: #F44336;
+		color: #f44336;
 	}
 
 	.serial-modal-content .disconnected {
-		color: #9E9E9E;
+		color: #9e9e9e;
 	}
 
 	.serial-modal-content button {
-		background: #4CAF50;
+		background: #4caf50;
 		color: white;
 		border: none;
 		padding: 0.75rem 1.5rem;

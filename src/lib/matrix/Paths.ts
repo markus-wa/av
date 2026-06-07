@@ -19,12 +19,15 @@ nSwitches=1
 
 Repeat
  */
-export async function pathABAB(matrixSwitcher: HomerunMatrixSwitcher, nSwitches: number): Promise<void> {
+export async function pathABAB(
+	matrixSwitcher: HomerunMatrixSwitcher,
+	nSwitches: number
+): Promise<void> {
 	const a = (nSwitches % 2) + 1;
 	const b = ((nSwitches + 1) % 2) + 1;
 
 	for (let i = 0; i < 16; i++) {
-		await matrixSwitcher.setPath(i%2 === 0 ? a : b, i + 1);
+		await matrixSwitcher.setPath(i % 2 === 0 ? a : b, i + 1);
 	}
 }
 
@@ -47,12 +50,15 @@ nSwitches=1
 
 Repeat
  */
-export async function pathAABBAABB(matrixSwitcher: HomerunMatrixSwitcher, nSwitches: number): Promise<void> {
+export async function pathAABBAABB(
+	matrixSwitcher: HomerunMatrixSwitcher,
+	nSwitches: number
+): Promise<void> {
 	const a = (nSwitches % 2) + 1;
 	const b = ((nSwitches + 1) % 2) + 1;
 
 	for (let i = 0; i < 16; i++) {
-		await matrixSwitcher.setPath(i%4 < 2 ? a : b, i + 1);
+		await matrixSwitcher.setPath(i % 4 < 2 ? a : b, i + 1);
 	}
 }
 
@@ -93,7 +99,10 @@ nSwitches=1
 4 = B
 ...
  */
-export async function pathCycleAB(matrixSwitcher: HomerunMatrixSwitcher, nSwitches: number): Promise<void> {
+export async function pathCycleAB(
+	matrixSwitcher: HomerunMatrixSwitcher,
+	nSwitches: number
+): Promise<void> {
 	const input = (nSwitches % 2) + 1;
 
 	for (let i = 0; i < 16; i++) {

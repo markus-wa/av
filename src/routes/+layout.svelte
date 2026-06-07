@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { initServiceWorker } from '$lib/serviceWorker';
-	
+
 	let { children } = $props();
-	import "../app.css";
+	import '../app.css';
 
 	onMount(() => {
 		// Initialize service worker

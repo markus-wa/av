@@ -11,13 +11,13 @@ function getInitialDebugState(): boolean {
 
 function createDebugStore(): Writable<boolean> {
 	const store = writable(getInitialDebugState());
-	
+
 	if (typeof window !== 'undefined') {
-		store.subscribe(value => {
+		store.subscribe((value) => {
 			localStorage.setItem(DEBUG_STORAGE_KEY, JSON.stringify(value));
 		});
 	}
-	
+
 	return store;
 }
 
@@ -25,7 +25,7 @@ export const debugMode = createDebugStore();
 
 // Helper functions
 export function toggleDebugMode(): void {
-	debugMode.update(v => !v);
+	debugMode.update((v) => !v);
 }
 
 export function enableDebugMode(): void {

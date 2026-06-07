@@ -31,7 +31,7 @@ console.log('[Service Worker] Dev mode');
 		port: 8443,
 		strictPort: true,
 		hmr: {
-			protocol: 'wss',
+			protocol: 'wss'
 		}
 	}
 });

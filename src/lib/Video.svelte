@@ -8,8 +8,8 @@
 
 	interface Playlist {
 		name: string;
-		entries: { name: string, url: string }[];
-		pausedMedia?: { name: string, url: string };
+		entries: { name: string; url: string }[];
+		pausedMedia?: { name: string; url: string };
 	}
 
 	export let videoElement: HTMLVideoElement | null = null;
@@ -114,7 +114,7 @@
 	}
 
 	let nextMediaInterval: ReturnType<typeof setInterval>;
-	
+
 	function setupInterval() {
 		if (nextMediaInterval) {
 			clearInterval(nextMediaInterval);
@@ -123,11 +123,12 @@
 	}
 
 	$: playlist = playlists && playlists[playlistIndex];
-	$: media = (paused && playlist?.pausedMedia)
-		? playlist.pausedMedia
-		: (playlist && playlist.entries[shuffle ? shuffleOrder[currentShuffleIndex] : mediaIndex]);
+	$: media =
+		paused && playlist?.pausedMedia
+			? playlist.pausedMedia
+			: playlist && playlist.entries[shuffle ? shuffleOrder[currentShuffleIndex] : mediaIndex];
 
-	$: isVideo = (mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4')));
+	$: isVideo = mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4'));
 	$: shuffleOrder = generateShuffleOrder(playlist?.entries?.length || 0);
 
 	$: {
@@ -176,7 +177,10 @@
 
 	// Ensure the shuffle order is up-to-date when in shuffle mode
 	$: if (mode === 2 && playlist && shuffle) {
-		if (shuffleOrder.length !== playlist.entries.length || shuffleOrder.indexOf(mediaIndex) === -1) {
+		if (
+			shuffleOrder.length !== playlist.entries.length ||
+			shuffleOrder.indexOf(mediaIndex) === -1
+		) {
 			currentShuffleIndex = shuffleOrder.indexOf(mediaIndex);
 		}
 	}
@@ -190,7 +194,7 @@
 
 		// Stop media streams
 		if (currentStream) {
-			currentStream.getTracks().forEach(track => track.stop());
+			currentStream.getTracks().forEach((track) => track.stop());
 			currentStream = null;
 		}
 
@@ -225,8 +229,6 @@
 			}
 		}
 	}
-
-
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
 		if (buttonIndex == SwitchPro.SELECT) {
@@ -298,14 +300,11 @@
 		try {
 			await navigator.mediaDevices.getUserMedia({ video: true });
 			const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-			devices = mediaDevices.filter((device) => device.kind === "videoinput");
-			devicesIds = [
-				...devices.map((device) => device.deviceId),
-				'screen',
-			];
+			devices = mediaDevices.filter((device) => device.kind === 'videoinput');
+			devicesIds = [...devices.map((device) => device.deviceId), 'screen'];
 		} catch (error) {
-			console.error("Error getting cameras:", error);
-			toast("Error accessing cameras");
+			console.error('Error getting cameras:', error);
+			toast('Error accessing cameras');
 		}
 	}
 
@@ -319,15 +318,15 @@
 			cleanupMedia();
 
 			const stream = await navigator.mediaDevices.getUserMedia({
-				video: { deviceId: { exact: deviceId } },
+				video: { deviceId: { exact: deviceId } }
 			});
 			currentStream = stream;
 			if (videoElement) {
 				videoElement.srcObject = stream;
 			}
 		} catch (error) {
-			console.error("Error starting camera:", error);
-			toast("Failed to start camera");
+			console.error('Error starting camera:', error);
+			toast('Failed to start camera');
 		}
 	}
 
@@ -341,10 +340,10 @@
 			if (videoElement) {
 				videoElement.srcObject = stream;
 			}
-			toast("Started screen capture");
+			toast('Started screen capture');
 		} catch (error) {
-			console.error("Error starting screen capture:", error);
-			toast("Failed to start screen capture");
+			console.error('Error starting screen capture:', error);
+			toast('Failed to start screen capture');
 		}
 	}
 
@@ -354,16 +353,16 @@
 
 		const hls = new Hls();
 		hlsInstance = hls;
-		
+
 		hls.loadSource('http://fl1.moveonjoy.com/NICKELODEON/index.m3u8');
 		hls.attachMedia(videoElement);
-		hls.on(Hls.Events.MANIFEST_PARSED, function() {
-			videoElement!.play().catch(e => console.error("HLS playback error:", e));
+		hls.on(Hls.Events.MANIFEST_PARSED, function () {
+			videoElement!.play().catch((e) => console.error('HLS playback error:', e));
 		});
-		hls.on(Hls.Events.ERROR, function(event, data) {
+		hls.on(Hls.Events.ERROR, function (event, data) {
 			if (data.fatal) {
-				console.error("HLS fatal error:", data);
-				toast("HLS stream error");
+				console.error('HLS fatal error:', data);
+				toast('HLS stream error');
 			}
 		});
 	}
@@ -384,8 +383,8 @@
 			try {
 				await videoElement.play();
 			} catch (error) {
-				console.error("Error playing video:", error);
-				toast("Error playing video");
+				console.error('Error playing video:', error);
+				toast('Error playing video');
 			}
 		} else {
 			if (!imgElement) return;
@@ -418,10 +417,10 @@
 				}
 			}
 			playlists = playlistsTmp;
-		console.log("Playlists loaded:", playlists);
+			console.log('Playlists loaded:', playlists);
 		} catch (error) {
-			console.error("Error loading playlists:", error);
-			toast("Error loading playlists");
+			console.error('Error loading playlists:', error);
+			toast('Error loading playlists');
 		}
 	}
 
@@ -479,6 +478,11 @@
 	});
 </script>
 
+<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null}
+></video>
+<img alt="img" class:invisible={isVideo} bind:this={imgElement} />
+<Stepper onParamsChange={handleParamsChange} />
+
 <style>
 	video {
 		position: fixed;
@@ -501,7 +505,3 @@
 		background: black;
 	}
 </style>
-
-<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null} ></video>
-<img alt="img" class:invisible={isVideo} bind:this={imgElement} />
-<Stepper onParamsChange={handleParamsChange} />

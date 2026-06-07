@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import * as THREE from "three";
+	import * as THREE from 'three';
 	import Stepper from '$lib/Stepper.svelte';
 	import {
 		ChromaticAberration,
@@ -31,7 +31,17 @@
 	let stepper: Stepper;
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
-	const shaders: Shader[] = [WaveformRipple, CRT, ColorGrading, EdgeDetection, ChromaticAberration, Pixelation, Glitch, Feedback, NeonGrid];
+	const shaders: Shader[] = [
+		WaveformRipple,
+		CRT,
+		ColorGrading,
+		EdgeDetection,
+		ChromaticAberration,
+		Pixelation,
+		Glitch,
+		Feedback,
+		NeonGrid
+	];
 
 	// Get settings from store
 	$: shaderSettings = $settings.shader;
@@ -43,7 +53,7 @@
 	let appliedShaderName: string | null = null;
 	$: if (shader && material && shader.name !== appliedShaderName) {
 		appliedShaderName = shader.name;
-		console.log("Shader changed:", shaderIndex, shader.name);
+		console.log('Shader changed:', shaderIndex, shader.name);
 		toast(`Shader: ${shader.name}`);
 		setShader(shader);
 	}
@@ -114,7 +124,7 @@
 					if (object.geometry) object.geometry.dispose();
 					if (object.material) {
 						if (object.material instanceof Array) {
-							object.material.forEach(material => material.dispose());
+							object.material.forEach((material) => material.dispose());
 						} else {
 							object.material.dispose();
 						}
@@ -123,18 +133,18 @@
 			});
 			scene = null;
 		}
-		
+
 		camera = null;
 	}
 
 	function cleanupAudio() {
 		if (audioStream) {
-			audioStream.getTracks().forEach(track => track.stop());
+			audioStream.getTracks().forEach((track) => track.stop());
 			audioStream = null;
 		}
 
 		if (audioContext) {
-			return audioContext.close().catch(e => console.error("Error closing audio context:", e));
+			return audioContext.close().catch((e) => console.error('Error closing audio context:', e));
 		}
 		return Promise.resolve();
 	}
@@ -188,10 +198,14 @@
 			return v;
 		}
 
-		if (material.uniforms.p0) material.uniforms.p0.value = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
-		if (material.uniforms.p1) material.uniforms.p1.value = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
-		if (material.uniforms.p2) material.uniforms.p2.value = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
-		if (material.uniforms.p3) material.uniforms.p3.value = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
+		if (material.uniforms.p0)
+			material.uniforms.p0.value = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
+		if (material.uniforms.p1)
+			material.uniforms.p1.value = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
+		if (material.uniforms.p2)
+			material.uniforms.p2.value = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
+		if (material.uniforms.p3)
+			material.uniforms.p3.value = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
 	}
 
 	let audioContext: AudioContext | null = null;
@@ -200,16 +214,16 @@
 	let audioStream: MediaStream | null = null;
 	let lastTime: number = 0;
 	let resizeHandler: (() => void) | null = null;
-	
+
 	// FPS monitoring
 	let fps: number = 0;
 	let frameCount: number = 0;
 	let lastFpsTime: number = 0;
 	let fpsStatus: 'high' | 'medium' | 'low' = 'high';
-	
+
 	// Sync with debug mode - FPS shows when debug is on
 	$: showFps = $debugMode;
-	
+
 	// Update FPS status
 	$: {
 		if (fps >= 50) {
@@ -233,12 +247,14 @@
 			audioData = new Float32Array(analyser.frequencyBinCount);
 			lastTime = performance.now();
 		} catch (error) {
-			console.error("Error initializing audio:", error);
+			console.error('Error initializing audio:', error);
 			// Continue without audio - shader will still work for non-audio shaders
 		}
 	}
 
-	function createTextureFromElement(element: HTMLVideoElement | HTMLImageElement): THREE.Texture | null {
+	function createTextureFromElement(
+		element: HTMLVideoElement | HTMLImageElement
+	): THREE.Texture | null {
 		if (element instanceof HTMLVideoElement) {
 			const tex = new THREE.VideoTexture(element);
 			tex.minFilter = THREE.LinearFilter;
@@ -263,7 +279,7 @@
 		// Calculate FPS
 		const now = performance.now();
 		frameCount++;
-		
+
 		if (now - lastFpsTime >= 1000) {
 			fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
 			frameCount = 0;
@@ -292,7 +308,7 @@
 		}
 
 		geometry = new THREE.PlaneGeometry(16, 9);
-		
+
 		if (mediaElement) {
 			texture = createTextureFromElement(mediaElement);
 		} else {
@@ -326,27 +342,30 @@
 		document.body.appendChild(renderer.domElement);
 
 		scene = new THREE.Scene();
-		
+
 		// Calculate the appropriate field of view to make the content fill the window
 		const updateCamera = () => {
 			const windowAspect = window.innerWidth / window.innerHeight;
-			const contentAspect = 16/9;
+			const contentAspect = 16 / 9;
 			let fov = 45;
-			
+
 			if (windowAspect > contentAspect) {
 				// Window is wider than content - adjust horizontal FOV
-				fov = 2 * Math.atan(Math.tan(45 * Math.PI / 360) * (windowAspect / contentAspect)) * 360 / Math.PI;
+				fov =
+					(2 * Math.atan(Math.tan((45 * Math.PI) / 360) * (windowAspect / contentAspect)) * 360) /
+					Math.PI;
 			} else {
 				// Window is taller than content - adjust vertical FOV
-				fov = 2 * Math.atan(Math.tan(45 * Math.PI / 360) * (contentAspect / windowAspect)) * 360 / Math.PI;
+				fov =
+					(2 * Math.atan(Math.tan((45 * Math.PI) / 360) * (contentAspect / windowAspect)) * 360) /
+					Math.PI;
 			}
-			
-			const zoomFactor = windowAspect > contentAspect 
-				? windowAspect / contentAspect 
-				: contentAspect / windowAspect;
-			
-			const distance = Math.abs(9 / (2 * Math.tan(fov * Math.PI / 360))) / zoomFactor;
-			
+
+			const zoomFactor =
+				windowAspect > contentAspect ? windowAspect / contentAspect : contentAspect / windowAspect;
+
+			const distance = Math.abs(9 / (2 * Math.tan((fov * Math.PI) / 360))) / zoomFactor;
+
 			if (!camera) {
 				camera = new THREE.PerspectiveCamera(fov, windowAspect, 0.1, 1000);
 				camera.position.z = distance;
@@ -395,7 +414,7 @@
 	}
 
 	onDestroy(async () => {
-		console.log('Destroying Three.js scene')
+		console.log('Destroying Three.js scene');
 
 		// Remove resize listener
 		if (resizeHandler) {
@@ -417,10 +436,22 @@
 	});
 </script>
 
-<Stepper bind:this={stepper} onParamsChange={handleParamsChanged} p0={shader?.uniforms.p0?.value || 0.5} p1={shader?.uniforms.p1?.value || 0.5} p2={shader?.uniforms.p2?.value || 0.5} p3={shader?.uniforms.p3?.value || 0.5} />
+<Stepper
+	bind:this={stepper}
+	onParamsChange={handleParamsChanged}
+	p0={shader?.uniforms.p0?.value || 0.5}
+	p1={shader?.uniforms.p1?.value || 0.5}
+	p2={shader?.uniforms.p2?.value || 0.5}
+	p3={shader?.uniforms.p3?.value || 0.5}
+/>
 
 {#if showFps}
-	<div class="fps-counter" class:high-fps={fpsStatus === 'high'} class:medium-fps={fpsStatus === 'medium'} class:low-fps={fpsStatus === 'low'}>
+	<div
+		class="fps-counter"
+		class:high-fps={fpsStatus === 'high'}
+		class:medium-fps={fpsStatus === 'medium'}
+		class:low-fps={fpsStatus === 'low'}
+	>
 		<div class="fps-value">{fps}</div>
 		<div class="fps-label">FPS</div>
 	</div>
@@ -439,28 +470,28 @@
 		z-index: 10000;
 		backdrop-filter: blur(10px);
 	}
-	
+
 	.fps-value {
 		font-size: 24px;
 		font-weight: bold;
 		margin-bottom: 2px;
 	}
-	
+
 	.fps-label {
 		font-size: 12px;
 		opacity: 0.8;
 		margin-bottom: 5px;
 	}
-	
+
 	.fps-counter.high-fps {
-		border-left: 3px solid #4CAF50;
+		border-left: 3px solid #4caf50;
 	}
-	
+
 	.fps-counter.medium-fps {
-		border-left: 3px solid #FFC107;
+		border-left: 3px solid #ffc107;
 	}
-	
+
 	.fps-counter.low-fps {
-		border-left: 3px solid #F44336;
+		border-left: 3px solid #f44336;
 	}
 </style>

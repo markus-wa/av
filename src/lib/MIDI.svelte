@@ -4,7 +4,7 @@
 	import SwitchPro from '$lib/Controllers.js';
 	import { settings, updateMidiSettings } from '$lib/stores/settings';
 
-	let axesState: ReadonlyArray<number> = [0,0,0,0];
+	let axesState: ReadonlyArray<number> = [0, 0, 0, 0];
 	let midiAccess: MIDIAccess | null = null;
 	let midiOutput: MIDIOutput | null = null;
 	let midiOutputs: MIDIOutput[] = [];
@@ -28,7 +28,7 @@
 		[SwitchPro.Y]: 6,
 		[SwitchPro.X]: 7,
 		[SwitchPro.LT2]: 8,
-		[SwitchPro.RT2]: 9,
+		[SwitchPro.RT2]: 9
 	};
 
 	const toggles: { [key: number]: number } = {
@@ -37,7 +37,7 @@
 		[SwitchPro.D_UP]: 12,
 		[SwitchPro.D_DOWN]: 13,
 		[SwitchPro.D_LEFT]: 14,
-		[SwitchPro.D_RIGHT]: 15,
+		[SwitchPro.D_RIGHT]: 15
 	};
 
 	// Update store when settings change
@@ -62,22 +62,22 @@
 	async function initMIDI(): Promise<void> {
 		try {
 			if (!('requestMIDIAccess' in navigator)) {
-				console.error("Web MIDI API not supported in this browser");
-				toast("Web MIDI API not supported");
+				console.error('Web MIDI API not supported in this browser');
+				toast('Web MIDI API not supported');
 				return;
 			}
 
 			midiAccess = await navigator.requestMIDIAccess();
-			
+
 			// Listen for MIDI device changes
 			midiAccess.onstatechange = (event: WebMidi.MIDIConnectionEvent) => {
-				console.log("MIDI device state change:", event);
+				console.log('MIDI device state change:', event);
 				// Re-initialize outputs when devices change
 				midiOutputs = Array.from(midiAccess!.outputs.values());
-				
+
 				// Try to keep the same output selected
 				if (lastMidiOutput) {
-					const stillExists = midiOutputs.some(o => o === lastMidiOutput);
+					const stillExists = midiOutputs.some((o) => o === lastMidiOutput);
 					if (!stillExists) {
 						// Previously selected device disconnected
 						lastMidiOutput = null;
@@ -91,31 +91,34 @@
 					}
 				}
 			};
-			
+
 			midiOutputs = Array.from(midiAccess.outputs.values());
-			
+
 			// Try to restore selected MIDI index from settings
 			if (selectedMidiIndex >= 0 && selectedMidiIndex < midiOutputs.length) {
 				midiOutput = midiOutputs[selectedMidiIndex];
 				lastMidiOutput = midiOutput;
 			} else {
 				// Fallback to CH345 or first device
-				selectedMidiIndex = Math.max(midiOutputs.findIndex((output) => output.name?.includes("CH345")), 0);
+				selectedMidiIndex = Math.max(
+					midiOutputs.findIndex((output) => output.name?.includes('CH345')),
+					0
+				);
 				updateSelectedMidiIndex(selectedMidiIndex);
 				if (midiOutputs.length > 0) {
 					midiOutput = midiOutputs[selectedMidiIndex];
 					lastMidiOutput = midiOutput;
 				}
 			}
-			
+
 			if (midiOutput) {
-				console.log("Selected MIDI output:", midiOutput.name);
+				console.log('Selected MIDI output:', midiOutput.name);
 			} else {
-				toast("No MIDI outputs available.");
+				toast('No MIDI outputs available.');
 			}
 		} catch (error) {
-			console.error("Error accessing MIDI:", error);
-			toast("Error accessing MIDI");
+			console.error('Error accessing MIDI:', error);
+			toast('Error accessing MIDI');
 		}
 	}
 
@@ -125,7 +128,7 @@
 			if (midiOutput) {
 				toast(`Selected MIDI device: ${midiOutput.name}`);
 			} else {
-				toast("No valid MIDI output.");
+				toast('No valid MIDI output.');
 			}
 			lastMidiOutput = midiOutput;
 		}
@@ -135,11 +138,11 @@
 		if (!midiOutput) return;
 
 		try {
-			midiOutput.send([0xB0 | channel, controller, value]); // Control Change
+			midiOutput.send([0xb0 | channel, controller, value]); // Control Change
 			console.log(`MIDI CC: Channel ${channel}, Controller ${controller}, Value ${value}`);
 		} catch (error) {
-			console.error("Error sending MIDI CC:", error);
-			toast("MIDI send error");
+			console.error('Error sending MIDI CC:', error);
+			toast('MIDI send error');
 		}
 	}
 
@@ -183,7 +186,7 @@
 			midiOutput.send([0x90 | channel, note, velocity]); // Note ON command
 			console.log(`MIDI Note ON: Channel ${channel}, Note ${note}, Velocity: ${velocity}`);
 		} catch (error) {
-			console.error("Error sending MIDI Note ON:", error);
+			console.error('Error sending MIDI Note ON:', error);
 		}
 	}
 
@@ -194,7 +197,7 @@
 			midiOutput.send([0x80 | channel, note, 0]); // Note OFF command
 			console.log(`MIDI Note OFF: Channel ${channel}, Note ${note}`);
 		} catch (error) {
-			console.error("Error sending MIDI Note OFF:", error);
+			console.error('Error sending MIDI Note OFF:', error);
 		}
 	}
 
@@ -206,7 +209,7 @@
 		}
 
 		updateStepSize(v);
-		console.log("stepSize:", stepSize);
+		console.log('stepSize:', stepSize);
 	}
 
 	function incStepSize(): void {
@@ -247,7 +250,7 @@
 					updateSelectedMidiIndex(newIndex);
 					midiOutput = midiOutputs[selectedMidiIndex];
 					lastMidiOutput = midiOutput;
-					console.log("Selected MIDI device:", midiOutput.name);
+					console.log('Selected MIDI device:', midiOutput.name);
 				}
 			} else {
 				decStepSize();
@@ -266,7 +269,7 @@
 					updateSelectedMidiIndex(newIndex);
 					midiOutput = midiOutputs[selectedMidiIndex];
 					lastMidiOutput = midiOutput;
-					console.log("Selected MIDI device:", midiOutput.name);
+					console.log('Selected MIDI device:', midiOutput.name);
 				}
 			} else {
 				incStepSize();
@@ -314,27 +317,27 @@
 	onDestroy(() => {
 		if (typeof window !== 'undefined') {
 			clearInterval(midiInterval);
-			
+
 			// Close MIDI access and clean up
 			if (midiAccess) {
 				try {
 					// Close all outputs
-					midiOutputs.forEach(output => {
+					midiOutputs.forEach((output) => {
 						try {
 							output.close?.();
 						} catch (e) {
-							console.error("Error closing MIDI output:", e);
+							console.error('Error closing MIDI output:', e);
 						}
 					});
-					
+
 					// Close access
 					midiAccess.onstatechange = null;
 					midiAccess = null;
 				} catch (error) {
-					console.error("Error cleaning up MIDI:", error);
+					console.error('Error cleaning up MIDI:', error);
 				}
 			}
-			
+
 			midiOutput = null;
 			midiOutputs = [];
 		}
