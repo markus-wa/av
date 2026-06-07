@@ -44,10 +44,10 @@ export const ColorGrading = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 1.0, min: 0.2 }, // Contrast (0-1)
-		p1: { value: 0.5 }, // Hue Shift (0-1)
-		p2: { value: 1.0 }, // Saturation (0-1)
-		p3: { value: 0.5 }  // Tint (0-1, neutral at 0.5)
+		p0: { value: 0.0 }, // Contrast (0=none, 1=max)
+		p1: { value: 0.0 }, // Hue Shift (0=none, 1=max)
+		p2: { value: 0.0 }, // Saturation (0=none, 1=max)
+		p3: { value: 0.0 }  // Tint (0=none, 1=max)
 	},
 	vertexShader: `
 			varying vec2 vUv;
@@ -62,12 +62,14 @@ export const ColorGrading = {
 			uniform float p0, p1, p2, p3;
 
 			vec3 applyContrast(vec3 color, float contrast) {
-				float c = contrast * 2.0;
-				return 0.5 + (color - 0.5) * c;
+				// 0 and 1 = original, 0.5 = max contrast
+				float effect = 4.0 * contrast * (1.0 - contrast);
+				return mix(color, 0.5 + (color - 0.5) * 2.0, effect);
 			}
 
 			vec3 applyHueShift(vec3 color, float hue) {
-				float angle = (hue - 0.5) * 6.28318; // Scale to 0-2π
+				// 0 and 1 = original (360°), 0.5 = 180° shift
+				float angle = hue * 6.28318;
 				float cosA = cos(angle);
 				float sinA = sin(angle);
 				mat3 hueRotation = mat3(
@@ -79,14 +81,17 @@ export const ColorGrading = {
 			}
 
 			vec3 applySaturation(vec3 color, float saturation) {
+				// 0 and 1 = original, 0.5 = max boost
+				float effect = saturation * (1.0 - saturation) * 4.0;
 				float luma = dot(color, vec3(0.299, 0.587, 0.114));
-				return mix(vec3(luma), color, pow(saturation, 2.0));
+				return luma + (color - vec3(luma)) * (1.0 + effect);
 			}
 
 			vec3 applyTint(vec3 color, float tint) {
-				float t = (tint - 0.5) * 2.0;
-				vec3 tintColor = vec3(1.0 + t, 1.0, 1.0 - t);
-				return mix(color, tintColor * color, abs(t));
+				// 0 and 1 = original, 0.5 = max tint
+				float tSin = sin(tint * 3.14159265359);
+				vec3 tintColor = vec3(1.0 + tSin, 1.0, 1.0 - tSin);
+				return mix(color, tintColor * color, tint);
 			}
 
 			void main() {
@@ -280,10 +285,10 @@ export const Glitch = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 0.5 },   // Glitch intensity (0-1)
-		p1: { value: 0.5 },   // Glitch frequency (0-1)
-		p2: { value: 0.5 },   // Color chaos (0-1)
-		p3: { value: 0.3 }    // Block distortion (0-1)
+		p0: { value: 0.5 },   // RGB Split Intensity (0-1)
+		p1: { value: 0.5 },   // Block Glitch Frequency (0-1)
+		p2: { value: 0.5 },   // Color Chaos / Noise (0-1)
+		p3: { value: 0.5 }    // Scanline / Artifact Intensity (0-1)
 	},
 	vertexShader: `
 		varying vec2 vUv;
@@ -323,264 +328,207 @@ export const Glitch = {
 			
 			// Base color
 			vec4 color = texture2D(tDiffuse, uv);
+			vec4 finalColor = color;
 			
-			// Global glitch parameters
-			float intensity = p0;
-			float frequency = 0.2 + p1 * 2.0;
-			float chaos = p2;
-			float blockDistort = p3;
-
-			// Time-based seed for randomness
-			float t = time * frequency;
+			// Time-based seed - use fract to prevent accumulation issues
+			float t = fract(time * 0.1);
 			
-			// Create per-pixel random values that change over time
-			float seed = rand(uv + t);
+			// === RGB Split (p0) ===
+			// Controls channel separation - the primary glitch effect
+			float splitScale = p0 * p0; // Quadratic for finer control at low values
 			
-			// RGB split with time-varying chaotic offsets
-			float offsetR = (rand(uv + t * 1.3) - 0.5) * 0.05 * intensity * (0.5 + chaos);
-			float offsetG = (rand(uv + t * 1.7) - 0.5) * 0.04 * intensity * (0.6 + chaos * 0.4);
-			float offsetB = (rand(uv + t * 2.1) - 0.5) * 0.06 * intensity * (0.4 + chaos * 0.6);
+			// Horizontal RGB offsets
+			float offsetR = (rand(uv + t * 1.3) - 0.5) * 0.05 * splitScale;
+			float offsetG = (rand(uv + t * 1.7) - 0.5) * 0.04 * splitScale;
+			float offsetB = (rand(uv + t * 2.1) - 0.5) * 0.06 * splitScale;
 			
-			// Also add vertical offsets for more distortion
-			float offsetRY = (rand(uv + t * 0.7) - 0.5) * 0.03 * intensity * chaos;
-			float offsetGY = (rand(uv + t * 1.1) - 0.5) * 0.02 * intensity * chaos;
-			float offsetBY = (rand(uv + t * 1.5) - 0.5) * 0.04 * intensity * chaos;
+			// Vertical RGB offsets
+			float offsetRY = (rand(uv + t * 0.7) - 0.5) * 0.03 * splitScale;
+			float offsetGY = (rand(uv + t * 1.1) - 0.5) * 0.02 * splitScale;
+			float offsetBY = (rand(uv + t * 1.5) - 0.5) * 0.04 * splitScale;
 			
-			// Sample each channel with different offsets
+			// Sample each channel with offsets
 			float r = texture2D(tDiffuse, uv + vec2(offsetR, offsetRY)).r;
 			float g = texture2D(tDiffuse, uv + vec2(offsetG, offsetGY)).g;
 			float b = texture2D(tDiffuse, uv + vec2(offsetB, offsetBY)).b;
+			finalColor.rgb = vec3(r, g, b);
 			
-			// Block distortion - random rectangular blocks that glitch
-			vec4 finalColor = vec4(r, g, b, 1.0);
+			// === Block Glitch (p1) ===
+			// Controls frequency and intensity of block-based artifacts
+			// Shows rectangles from different parts of the scene with partial opacity
+			float blockIntensity = p1 * p1;
 			
-			if (blockDistort > 0.0) {
-				// Divide screen into blocks of random size
-				float blockDensity = 3.0 + p1 * 20.0;
+			if (blockIntensity > 0.001) {
+				// Number of blocks across screen (higher = smaller blocks)
+				float blockDensity = 5.0 + p1 * 25.0;
 				vec2 blockCoord = floor(uv * blockDensity);
 				
-				// Add time-based randomness to block positions
-				float blockRand = rand(blockCoord + vec2(t * 0.3));
+				// Random value for this block - use fract time
+				float blockRand = rand(blockCoord + vec2(fract(t * 0.3)));
 				
-				// Occasionally create a glitch block
-				if (blockRand < 0.05 * blockDistort) {
-					// Random offset for this block
-					float blockOffsetX = (rand(blockCoord + vec2(t, 0.0)) - 0.5) * 0.2 * blockDistort;
-					float blockOffsetY = (rand(blockCoord + vec2(0.0, t)) - 0.5) * 0.2 * blockDistort;
+				// Trigger block glitch based on p1
+				if (blockRand < 0.15 * blockIntensity) {
+					// Sample from a different rectangular region of the scene
+					// Use rand of blockCoord to get consistent but different source region
+					vec2 sourceOffset = vec2(
+						fract(rand(blockCoord) * 0.7 + 0.1),
+						fract(rand(blockCoord + vec2(1.0, 0.0)) * 0.7 + 0.1)
+					);
 					
-					// Sample from a random position
-					vec2 glitchUV = uv + vec2(blockOffsetX, blockOffsetY);
+					// Define the size of the source rectangle (as fraction of screen)
+					vec2 blockSize = vec2(0.05, 0.1) * (0.3 + blockIntensity * 0.7);
+					
+					// Map current UV within block to source rectangle UV
+					vec2 uvInBlock = fract(uv * blockDensity);
+					vec2 glitchUV = sourceOffset + uvInBlock * blockSize;
+					
+					// Clamp to valid texture coordinates
+					glitchUV = clamp(glitchUV, 0.0, 1.0);
+					
+					// Sample from the source rectangle
 					vec4 glitchSample = texture2D(tDiffuse, glitchUV);
 					
-					// Mix with original
-					float mixAmount = 0.3 + rand(blockCoord + vec2(t * 0.5)) * 0.7;
-					finalColor = mix(finalColor, glitchSample, mixAmount * blockDistort);
+					// Apply color chaos (p2) to the glitch rectangle
+					float rectChaos = p2 * p2;
+					if (rectChaos > 0.01) {
+						// Add RGB split to the glitch sample based on p2
+						float chaosOffsetR = (rand(glitchUV + vec2(t * 1.3)) - 0.5) * 0.03 * rectChaos;
+						float chaosOffsetG = (rand(glitchUV + vec2(t * 1.7)) - 0.5) * 0.03 * rectChaos;
+						float chaosOffsetB = (rand(glitchUV + vec2(t * 2.1)) - 0.5) * 0.03 * rectChaos;
+						glitchSample.r = texture2D(tDiffuse, glitchUV + vec2(chaosOffsetR, 0.0)).r;
+						glitchSample.g = texture2D(tDiffuse, glitchUV + vec2(chaosOffsetG, 0.0)).g;
+						glitchSample.b = texture2D(tDiffuse, glitchUV + vec2(chaosOffsetB, 0.0)).b;
+						
+						// Random color tint on rectangle based on p2
+						if (rand(blockCoord + vec2(2.0)) < rectChaos * 0.5) {
+							glitchSample.rgb *= vec3(1.0, 0.7, 0.3);
+						}
+					}
+					
+					// Partial opacity - blend with original, controlled by p1
+					float opacity = 0.3 + p1 * 0.7;
+					finalColor = mix(finalColor, glitchSample, opacity);
 				}
 				
-				// Sometimes invert colors in a block
-				if (rand(blockCoord + vec2(t * 0.7)) < 0.02 * blockDistort) {
+				// Color inversion in blocks (less frequent)
+				if (blockRand < 0.05 * blockIntensity) {
 					finalColor.rgb = 1.0 - finalColor.rgb;
-				}
-				
-				// Add scanline-like artifacts
-				if (rand(vec2(uv.x, t * 0.5)) < 0.03 * blockDistort) {
-					finalColor.rgb *= vec3(1.0, 0.7, 0.3) * (0.5 + 0.5 * sin(t * 10.0));
 				}
 			}
 			
-			// Add chromatic aberration at edges with time variation
+			// === Color Chaos / Noise (p2) ===
+			// Controls color channel manipulation and noise
+			float chaos = p2 * p2;
+			
+			// Chromatic aberration at edges
 			vec2 center = vec2(0.5);
 			float distFromCenter = distance(uv, center);
-			float edgeBoost = smoothstep(0.3, 0.8, distFromCenter) * 2.0;
+			float edgeBoost = smoothstep(0.3, 0.8, distFromCenter);
 			
-			finalColor.r += offsetR * edgeBoost * chaos * 0.5;
-			finalColor.g += offsetG * edgeBoost * chaos * 0.5;
-			finalColor.b += offsetB * edgeBoost * chaos * 0.5;
+			finalColor.r += offsetR * edgeBoost * chaos * 2.0;
+			finalColor.g += offsetG * edgeBoost * chaos * 2.0;
+			finalColor.b += offsetB * edgeBoost * chaos * 2.0;
 			
-			// Add subtle noise across the entire image
-			float globalNoise = (noise(uv * 5.0 + t * 0.2) - 0.5) * 0.05 * intensity * chaos;
+			// Global color noise
+			float globalNoise = (noise(uv * 10.0 + fract(t * 0.3)) - 0.5) * 0.08 * chaos;
 			finalColor.rgb += vec3(globalNoise);
+			
+			// Color channel swapping based on chaos
+			if (chaos > 0.1) {
+				float swapProb = chaos * 0.5;
+				if (rand(uv + vec2(fract(t * 2.0))) < swapProb) {
+					finalColor.rgb = finalColor.gbr; // Swap R and B
+				}
+				if (rand(uv + vec2(fract(t * 3.0))) < swapProb * 0.5) {
+					finalColor.rgb = finalColor.bgr; // Full rotation
+				}
+			}
+			
+			// === Scanline / Artifact Intensity (p3) ===
+			// Controls horizontal artifacts and scanline effects
+			float artifactIntensity = p3 * p3;
+			
+			// Scanline effect - horizontal lines
+			float scanlinePos = fract(uv.y * 200.0 + fract(t * 10.0));
+			float scanline = smoothstep(0.0, 0.02, scanlinePos) * artifactIntensity * 2.0;
+			if (scanline > 0.0) {
+				finalColor.rgb *= vec3(1.0 - scanline, 0.9, 0.8);
+			}
+			
+			// Random pixel artifacts
+			if (rand(uv + vec2(fract(t * 5.0))) < 0.01 * artifactIntensity) {
+				finalColor.rgb *= vec3(1.0, 0.5, 0.0) * (0.5 + 0.5 * sin(fract(t * 20.0) * 6.28318));
+			}
+			
+			// Vertical stripe artifacts
+			if (rand(vec2(uv.x * 0.1, fract(t))) < 0.02 * artifactIntensity) {
+				finalColor.rgb = mix(finalColor.rgb, vec3(0.0), 0.3 * artifactIntensity);
+			}
 			
 			gl_FragColor = finalColor;
 		}
 	`
 };
 
-// Feedback / Mirror Effect
 export const NeonGrid = {
-	name: 'Neon Grid',
+	name: 'NeonGrid',
 	uniforms: {
 		tDiffuse: { value: null },
-		audioData: { value: new Float32Array(512) },
 		time: { value: 0.0 },
-		p0: { value: 0.5 },   // Perspective depth (0-1)
-		p1: { value: 0.5 },   // Neon intensity (0-1)
-		p2: { value: 0.5 },   // Rotation speed (0-1)
-		p3: { value: 0.5 }    // Color mode (0-1)
+		p0: { value: 0.001 }, // grid scale / perspective
+		p1: { value: 0.3 }, // scroll speed
+		p2: { value: 1.0 }, // vanishing point height
+		p3: { value: 1.0 } // neon glow intensity
 	},
 	vertexShader: `
-		varying vec2 vUv;
-		void main() {
-			vUv = uv;
-			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-		}
-	`,
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
 	fragmentShader: `
-		varying vec2 vUv;
-		uniform sampler2D tDiffuse;
-		uniform float audioData[512];
-		uniform float time;
-		uniform float p0, p1, p2, p3;
+    varying vec2 vUv;
+    uniform sampler2D tDiffuse;
+    uniform float time;
+    uniform float p0, p1, p2, p3;
 
-		// Vaporwave synthwave color palettes
-		vec3 getNeonColor(float t, float intensity) {
-			float r, g, b;
-			
-			// Classic vaporwave: pink, teal, purple
-			float hue = fract(t * 0.1 + 0.5);
-			r = sin(hue * 6.28318 + 0.0) * 0.5 + 0.5;
-			g = sin(hue * 6.28318 + 2.094) * 0.5 + 0.5;
-			b = sin(hue * 6.28318 + 4.188) * 0.5 + 0.5;
-			
-			// Boost saturation and add glow
-			vec3 color = vec3(r, g, b);
-			float glow = pow(intensity, 1.5) * 2.0;
-			return color * (0.6 + glow);
-		}
+    const vec3 NEON_PINK   = vec3(1.0, 0.1, 0.85);
+    const vec3 NEON_PURPLE = vec3(0.45, 0.05, 0.6);
 
-		// Audio analysis - weighted towards bass
-		float getAudioIntensity() {
-			float intensity = 0.0;
-			for(int i = 0; i < 16; i++) {
-				int binIndex = i * 4;
-				float dbValue = audioData[binIndex];
-				float normalizedValue = clamp((dbValue + 140.0) / 140.0, 0.0, 1.0);
-				intensity += normalizedValue * (1.0 - float(i) / 16.0);
-			}
-			intensity /= 16.0;
-			return pow(intensity * 2.0, 0.33);
-		}
+    void main() {
+      vec2 uv = vUv;
+      float horizon = p2;
 
-		// Random hash for grid variation
-		float hash(vec2 p) {
-			p = 50.0 * fract(p * 0.3183099 + vec2(0.71, 0.113));
-			return -1.0 + 2.0 * fract(p.x * p.y * (p.x + p.y));
-		}
+      float depth = (horizon - uv.y);
+      float persp = 1.0 / (depth + 0.04);
+      float gx = (uv.x - 0.5) * persp * (4.0 + p0 * 8.0);
+      float gz = persp * (2.0 + p0 * 4.0) + time * p1 * 0.01;
+      vec2 g = vec2(gx, gz);
 
-		// Noise for organic feel
-		float noise(vec2 st) {
-			vec2 i = floor(st);
-			vec2 f = fract(st);
-			vec2 u = f * f * (3.0 - 2.0 * f);
-			return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
-			           mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-		}
+      // distance to nearest line in each axis, in cells
+      vec2 grids = abs(fract(g) - 0.5);
+      vec2 lineW = fwidth(g);
 
-		void main() {
-			vec2 uv = vUv;
-			vec2 center = vec2(0.5);
-			
-			// Get base color from texture
-			vec4 baseColor = texture2D(tDiffuse, uv);
-			
-			// Calculate audio intensity
-			float audioIntensity = getAudioIntensity();
-			
-			// Map parameters
-			float depth = mix(0.1, 2.0, p0);
-			float neonIntensity = p1;
-			float rotationSpeed = p2;
-			float colorMode = p3;
-			
-			// Center coordinates
-			vec2 dir = uv - center;
-			
-			// Apply rotation based on time and audio
-			float rotation = time * rotationSpeed * 0.5 + audioIntensity * 0.2;
-			float s = sin(rotation);
-			float c = cos(rotation);
-			mat2 rot = mat2(c, -s, s, c);
-			vec2 rotatedDir = dir * rot;
-			
-			// Perspective projection - plane going outward
-			float perspective = 1.0 / (1.0 + length(rotatedDir) * depth);
-			vec2 perspectiveUV = rotatedDir * perspective * 0.5 + center;
-			
-			// Create grid lines radiating from center
-			// Use perspectiveUV for the grid so it follows the perspective
-			vec2 gridUV = perspectiveUV;
-			
-			// Grid spacing - increases with distance from center
-			float gridScale = mix(5.0, 20.0, p0) * perspective;
-			
-			// Grid lines
-			vec2 grid = gridUV * gridScale;
-			
-			// Create thicker grid lines with smooth edges
-			float lineWidth = mix(0.02, 0.08, 1.0 - p0 * 0.5) * (0.5 + audioIntensity * 0.5);
-			
-			// Vertical lines
-			float lineX = abs(fract(grid.x + 0.5) - 0.5);
-			float verticalLine = smoothstep(lineWidth, 0.0, lineX);
-			
-			// Horizontal lines
-			float lineY = abs(fract(grid.y + 0.5) - 0.5);
-			float horizontalLine = smoothstep(lineWidth, 0.0, lineY);
-			
-			// Combine - use max for grid effect
-			float gridPattern = max(verticalLine, horizontalLine);
-			
-			// Add radial lines from center (vaporware style)
-			float angle = atan(rotatedDir.y, rotatedDir.x) + time * 0.1;
-			float radialLines = 0.0;
-			float numRadialLines = mix(4.0, 16.0, p0);
-			for(int i = 0; i < 8; i++) {
-				float lineAngle = float(i) * 6.28318 / numRadialLines - rotation;
-				float angleDiff = abs(angle - lineAngle);
-				float minDiff = min(angleDiff, 6.28318 - angleDiff);
-				radialLines += smoothstep(0.1, 0.05, minDiff * numRadialLines) * 0.5;
-			}
-			
-			// Combine patterns
-			float neonMask = max(gridPattern, radialLines * 1.5);
-			
-			// Distance from center for glow effect
-			float distFromCenter = length(dir) * 2.0;
-			float centerGlow = smoothstep(0.3, 0.0, distFromCenter) * (0.5 + audioIntensity);
-			
-			// Get neon color based on position and time
-			float colorTime = time * 0.3 + length(rotatedDir) * 2.0 + audioIntensity * 10.0;
-			vec3 neonColor = getNeonColor(colorTime, neonIntensity);
-			
-			// Apply perspective distortion to color
-			neonColor *= perspective * 2.0;
-			
-			// Combine everything
-			vec3 gridGlow = neonColor * neonMask * neonIntensity * (1.0 + centerGlow);
-			
-			// Add horizon line (vaporware staple) - horizontal line at center
-			float horizon = smoothstep(0.02, 0.0, abs(rotatedDir.y)) * 2.0;
-			vec3 horizonColor = getNeonColor(time * 0.2, neonIntensity * 1.5);
-			horizonColor.b *= 2.0; // More blue in horizon
-			gridGlow += horizonColor * horizon * (0.3 + audioIntensity * 0.5);
-			
-			// Mix with base color
-			vec3 finalColor = mix(baseColor.rgb, gridGlow, neonIntensity);
-			
-			// Add fog/distance effect
-			float fog = perspective * 0.3;
-			finalColor = mix(finalColor, neonColor * 0.3, fog * neonIntensity);
-			
-			// Add subtle noise for texture
-			float n = noise(uv * 50.0 + time * 0.1) * 0.03 * audioIntensity;
-			finalColor += vec3(n);
-			
-			// Final brightness boost from audio
-			finalColor *= mix(1.0, 1.8, audioIntensity * neonIntensity);
-			
-			gl_FragColor = vec4(finalColor, baseColor.a);
-		}
-	`
+      // sharp line core
+      vec2 core2 = 1.0 - smoothstep(vec2(0.0), lineW * 1.5, grids);
+      float core = clamp(core2.x + core2.y, 0.0, 1.0);
+
+      // soft bright glow falloff around the lines
+      vec2 glow2 = 1.0 - smoothstep(vec2(0.0), lineW * 6.0 + 0.03, grids);
+      float glow = clamp(glow2.x + glow2.y, 0.0, 1.0);
+
+      vec3 gcol = mix(NEON_PURPLE, NEON_PINK, clamp(uv.y / horizon, 0.0, 1.0));
+      // bright white-hot core, neon glow around it
+      vec3 outCol = gcol * glow + vec3(1.0) * core;
+
+      // alpha: solid on the core, fading glow, nothing in between
+      float alpha = clamp(core + glow * (0.35 + p3 * 0.5), 0.0, 1.0);
+      alpha = pow(alpha, 1.3); // crush the faint midground so gaps stay clear
+
+      gl_FragColor = vec4(outCol, alpha);
+    }
+  `
 };
 
 export const Feedback = {
@@ -620,9 +568,9 @@ export const Feedback = {
 			// Calculate vector from center
 			vec2 dir = uv - center;
 			
-			// Apply rotation based on p2
+			// Apply rotation based on p2 - use fract to prevent accumulation
 			float rotation = p2 * 6.28318; // 0-1 -> 0-2π
-			mat2 rotationMatrix = rotate2D(rotation * time * 0.1);
+			mat2 rotationMatrix = rotate2D(rotation * fract(time * 0.1) * 0.1);
 			vec2 rotatedDir = dir * rotationMatrix;
 			
 			// Apply zoom
@@ -634,9 +582,9 @@ export const Feedback = {
 			
 			// Add distortion
 			if (p3 > 0.0) {
-				// Wave distortion
-				feedbackUV.x += sin(feedbackUV.y * 20.0 + time) * p3 * 0.05;
-				feedbackUV.y += cos(feedbackUV.x * 20.0 + time) * p3 * 0.05;
+				// Wave distortion - use fract to prevent accumulation
+				feedbackUV.x += sin(feedbackUV.y * 20.0 + fract(time * 0.5)) * p3 * 0.05;
+				feedbackUV.y += cos(feedbackUV.x * 20.0 + fract(time * 0.5)) * p3 * 0.05;
 				
 				// Clip to [0,1] range
 				feedbackUV = clamp(feedbackUV, 0.0, 1.0);
@@ -657,8 +605,8 @@ export const Feedback = {
 			// Add inverted feedback
 			color = mix(color, feedbackColor, p0 * 0.5);
 			
-			// Add time-based pulsing
-			float pulse = sin(time * 2.0) * 0.5 + 0.5;
+			// Add time-based pulsing - use fract to prevent accumulation
+			float pulse = sin(fract(time * 0.1) * 20.0) * 0.5 + 0.5;
 			color.rgb *= mix(1.0, vec3(1.0, 0.8, 0.6), p0 * pulse * 0.3);
 			
 			gl_FragColor = color;

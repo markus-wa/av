@@ -151,13 +151,10 @@
 
 		const next = UniformsUtils.clone(shader.uniforms);
 
-		// Preserve live uniforms across shader swaps
+		// Preserve essential uniforms but reset p0-p3 to shader defaults
 		next.tDiffuse = { value: texture };
 		if (material.uniforms.audioData) next.audioData = material.uniforms.audioData;
 		if (material.uniforms.time) next.time = { value: material.uniforms.time.value };
-		for (const k of ['p0', 'p1', 'p2', 'p3']) {
-			if (material.uniforms[k] && next[k]) next[k].value = material.uniforms[k].value;
-		}
 
 		material.uniforms = next;
 		material.fragmentShader = shader.fragmentShader;
