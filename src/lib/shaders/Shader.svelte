@@ -188,17 +188,10 @@
 			return v;
 		}
 
-		p0 = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
-		p1 = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
-		p2 = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
-		p3 = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
-
-
-
-		if (material.uniforms.p0) material.uniforms.p0.value = p0;
-		if (material.uniforms.p1) material.uniforms.p1.value = p1;
-		if (material.uniforms.p2) material.uniforms.p2.value = p2;
-		if (material.uniforms.p3) material.uniforms.p3.value = p3;
+		if (material.uniforms.p0) material.uniforms.p0.value = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
+		if (material.uniforms.p1) material.uniforms.p1.value = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
+		if (material.uniforms.p2) material.uniforms.p2.value = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
+		if (material.uniforms.p3) material.uniforms.p3.value = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
 	}
 
 	let audioContext: AudioContext | null = null;
