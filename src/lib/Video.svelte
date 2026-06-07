@@ -20,6 +20,7 @@
 	let hlsInstance: Hls | null = null;
 	let currentStream: MediaStream | null = null;
 	let currentVideoUrl: string | null = null;
+	let stepper: Stepper;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
 	// Get settings from store
@@ -29,6 +30,7 @@
 	$: shuffle = videoSettings.shuffle;
 	$: cutVideo = videoSettings.cutVideo;
 	$: nextMediaIntervalSec = videoSettings.nextMediaIntervalSec;
+	$: playbackRate = videoSettings.playbackRate;
 	$: deviceIndex = videoSettings.deviceIndex;
 	$: mediaIndex = videoSettings.mediaIndex;
 	$: playlistIndex = videoSettings.playlistIndex;
@@ -37,21 +39,35 @@
 		updatePlaylistIndex(playlists.length - 1);
 	}
 
+	$: if (videoElement) {
+		videoElement.playbackRate = playbackRate;
+	}
+
 	// Shuffle-related state
 	let currentShuffleIndex: number = 0;
 
 	// Update store when settings change
 	function updateMode(newMode: number) {
+		if (newMode > 2) {
+			newMode = 0;
+		} else if (newMode < 0) {
+			newMode = 2;
+		}
+
 		updateVideoSettings({ mode: newMode });
+	}
+
+	$: {
 		// Handle media initialization directly within user gesture context
-		if (newMode === 0) {
+		if (mode === 0) {
 			cleanupMedia();
+			console.log(devicesIds, selectedDeviceId)
 			if (selectedDeviceId === 'screen') {
 				startScreenCapture();
 			} else {
 				startCamera(selectedDeviceId);
 			}
-		} else if (newMode === 1) {
+		} else if (mode === 1) {
 			cleanupMedia();
 			startHLS();
 		}
@@ -77,13 +93,31 @@
 
 	function updateNextMediaInterval(newInterval: number) {
 		updateVideoSettings({ nextMediaIntervalSec: newInterval });
+		toast(`Interval: ${newInterval}s`);
+	}
+
+	function updatePlaybackRate(newRate: number) {
+		updateVideoSettings({ playbackRate: newRate });
+		toast(`Playback Rate: ${newRate.toFixed(1)}x`);
 	}
 
 	function updateDeviceIndex(newIndex: number) {
+		if (newIndex < 0) {
+			newIndex = devicesIds.length - 1;
+		} else if (newIndex >= devicesIds.length) {
+			newIndex = 0;
+		}
+
 		updateVideoSettings({ deviceIndex: newIndex });
 	}
 
 	function updateMediaIndex(newIndex: number) {
+		if (newIndex < 0) {
+			newIndex = playlist?.entries.length - 1;
+		} else if (playlist && newIndex >= playlist?.entries.length - 1) {
+			newIndex = 0;
+		}
+
 		updateVideoSettings({ mediaIndex: newIndex });
 	}
 
@@ -91,27 +125,38 @@
 		updateVideoSettings({ playlistIndex: newIndex });
 	}
 
-	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
-	function handleParamsChange(newNextMediaIntervalSec: number): void {
-		// Only update if value actually changed to avoid recreating interval
-		const newValue = 1 + Math.floor(newNextMediaIntervalSec * 9);
-		if (newValue !== nextMediaIntervalSec) {
-			updateNextMediaInterval(newValue);
-			// Recreate interval with new timing
-			if (nextMediaInterval) {
-				clearInterval(nextMediaInterval);
-			}
-			nextMediaInterval = setInterval(nextMedia, nextMediaIntervalSec * 1000);
-		}
-	}
-
 	let nextMediaInterval: ReturnType<typeof setInterval>;
 
-	function setupInterval() {
+	function setupNextMediaInterval(t: number) {
 		if (nextMediaInterval) {
 			clearInterval(nextMediaInterval);
 		}
-		nextMediaInterval = setInterval(nextMedia, nextMediaIntervalSec * 1000);
+
+		nextMediaInterval = setInterval(nextMedia, t);
+
+		console.log(`nextMediaInterval (ms): ${t}`)
+	}
+
+	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
+	function handleParamsChange(p0: number, _p1: number, p2: number): void {
+		console.log(`handleParamsChange: ${p0} ${p2}`)
+		// Only update if value actually changed to avoid recreating interval
+		const newNextMediaIntervalSec = 1 + Math.floor(p0 * 9);
+
+		// make playback speed be 1 if either p2 = 0 or 1, make speed be 0.1 if p2 = 0.25, and make it be 10 if p2 = 0.25 - using a sinus curve to interpolate in between
+		const mult = p2 === 1 ? 0 : 9 * Math.sin(p2 * Math.PI * 2);
+
+		const newPlaybackRate = 1 + (mult > 0 ? mult : mult/10);
+
+		if (newNextMediaIntervalSec !== nextMediaIntervalSec) {
+			updateNextMediaInterval(newNextMediaIntervalSec);
+			// Recreate interval with new timing
+			setupNextMediaInterval(nextMediaIntervalSec * 1000);
+		}
+
+		if (newPlaybackRate !== playbackRate) {
+			updatePlaybackRate(newPlaybackRate);
+		}
 	}
 
 	$: playlist = playlists && playlists[playlistIndex];
@@ -206,61 +251,32 @@
 		}
 	}
 
-	// Ensure indices stay within range
-	$: {
-		if (mode === 0) {
-			if (deviceIndex >= devicesIds.length) {
-				updateDeviceIndex(0);
-			} else if (deviceIndex < 0) {
-				updateDeviceIndex(devicesIds.length - 1);
-			}
-		} else if (mode === 2 && playlist) {
-			if (!shuffle) {
-				if (mediaIndex >= playlist.entries.length) {
-					updateMediaIndex(0);
-				} else if (mediaIndex < 0) {
-					updateMediaIndex(playlist.entries.length - 1);
-				}
-			}
-		}
+	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
+		stepper.onAxesStateChange(axes);
 	}
 
 	export function onButtonStateChange(buttonIndex: number, isPressed: boolean): void {
+		stepper.onButtonStateChange(buttonIndex, isPressed);
+
 		if (buttonIndex == SwitchPro.SELECT) {
 			if (!isPressed) return;
-			if (mode === 2) {
-				updateMode(0);
-			} else {
-				updateMode(mode + 1);
-			}
+			updateMode(mode + 1);
 		} else if (buttonIndex == SwitchPro.START) {
 			if (!isPressed) return;
-			if (mode === 0) {
-				updateMode(2);
-			} else {
-				updateMode(mode - 1);
-			}
+			updateMode(mode - 1);
 		} else if (buttonIndex == SwitchPro.LT) {
 			if (!isPressed) return;
 			if (mode === 0) {
 				updateDeviceIndex(deviceIndex - 1);
 			} else if (mode === 2) {
-				if (shuffle) {
-					prevShuffleMedia();
-				} else {
-					updateMediaIndex(mediaIndex - 1);
-				}
+				prevMedia();
 			}
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
 			if (mode === 0) {
 				updateDeviceIndex(deviceIndex + 1);
 			} else if (mode === 2) {
-				if (shuffle) {
-					nextShuffleMedia();
-				} else {
-					updateMediaIndex(mediaIndex + 1);
-				}
+				nextMedia();
 			}
 		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;
@@ -288,8 +304,6 @@
 			updateCut(!cutVideo);
 		}
 	}
-
-	export function onAxesStateChange(): void {}
 
 	async function getCameras(): Promise<void> {
 		try {
@@ -346,10 +360,12 @@
 		cleanupMedia();
 		if (!videoElement) return;
 
+		toast('Starting HLS stream');
+
 		const hls = new Hls();
 		hlsInstance = hls;
 
-		hls.loadSource('http://fl1.moveonjoy.com/NICKELODEON/index.m3u8');
+		hls.loadSource('https://matchmaker.live.bidi.net.uk/vs-cmaf-pushb-uk/x=4/i=urn:bbc:pips:service:bbc_four_hd/pc_hd_abr_v2.fmp4.m3u8');
 		hls.attachMedia(videoElement);
 		hls.on(Hls.Events.MANIFEST_PARSED, function () {
 			videoElement!.play().catch((e) => console.error('HLS playback error:', e));
@@ -369,11 +385,11 @@
 			videoElement.srcObject = null;
 			videoElement.src = url;
 			videoElement.onended = () => {
-				if (shuffle) {
-					nextShuffleMedia();
-				} else {
-					updateMediaIndex(mediaIndex + 1);
+				if (loopVideos) {
+					return;
 				}
+
+				nextMedia();
 			};
 			try {
 				await videoElement.play();
@@ -452,7 +468,7 @@
 	}
 
 	function nextMedia() {
-		if (mode === 2 && (!isVideo || cutVideo)) {
+		if (mode === 2 && (!isVideo || cutVideo || loopVideos)) {
 			if (shuffle) {
 				nextShuffleMedia();
 			} else {
@@ -461,9 +477,19 @@
 		}
 	}
 
+	function prevMedia() {
+		if (mode === 2 && (!isVideo || cutVideo)) {
+			if (shuffle) {
+				prevShuffleMedia();
+			} else {
+				updateMediaIndex(mediaIndex - 1);
+			}
+		}
+	}
+
 	onMount(() => {
 		reload();
-		setupInterval();
+		setupNextMediaInterval(nextMediaIntervalSec * 1000);
 	});
 
 	onDestroy(() => {
@@ -473,10 +499,9 @@
 	});
 </script>
 
-<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos || null}
-></video>
+<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos}></video>
 <img alt="img" class:invisible={isVideo} bind:this={imgElement} />
-<Stepper onParamsChange={handleParamsChange} />
+<Stepper bind:this={stepper} onParamsChange={handleParamsChange} />
 
 <style>
 	video {

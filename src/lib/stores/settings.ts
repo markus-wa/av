@@ -8,6 +8,7 @@ interface AVSettings {
 		shuffle: boolean;
 		cutVideo: boolean;
 		nextMediaIntervalSec: number;
+		playbackRate: number;
 		deviceIndex: number;
 		mediaIndex: number;
 		playlistIndex: number;
@@ -39,7 +40,8 @@ const DEFAULT_SETTINGS: AVSettings = {
 		loopVideos: false,
 		shuffle: true,
 		cutVideo: false,
-		nextMediaIntervalSec: 5,
+		nextMediaIntervalSec: 10,
+		playbackRate: 1.0,
 		deviceIndex: 0,
 		mediaIndex: 0,
 		playlistIndex: 0

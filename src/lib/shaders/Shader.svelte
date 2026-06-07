@@ -32,15 +32,15 @@
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
 	const shaders: Shader[] = [
-		WaveformRipple,
-		CRT,
 		ColorGrading,
+		CRT,
 		EdgeDetection,
 		ChromaticAberration,
 		Pixelation,
 		Glitch,
 		Feedback,
-		NeonGrid
+		NeonGrid,
+		WaveformRipple,
 	];
 
 	// Get settings from store
@@ -164,16 +164,10 @@
 	function setShader(shader: Shader): void {
 		if (!material || !scene) return;
 
-		const next = UniformsUtils.clone(shader.uniforms);
-
-		// Preserve essential uniforms but reset p0-p3 to shader defaults
-		next.tDiffuse = { value: texture };
-		if (material.uniforms.audioData) next.audioData = material.uniforms.audioData;
-		if (material.uniforms.time) next.time = { value: material.uniforms.time.value };
-
-		material.uniforms = next;
 		material.fragmentShader = shader.fragmentShader;
 		material.vertexShader = shader.vertexShader;
+		material.uniforms = Object.assign(material.uniforms, UniformsUtils.clone(shader.uniforms));
+		material.uniforms.tDiffuse.value = texture;
 		material.needsUpdate = true;
 	}
 
@@ -203,13 +197,13 @@
 			return v;
 		}
 
-		if (material.uniforms.p0 !== undefined)
+		if (material.uniforms.p0 !== undefined && shader.uniforms.p0 !== undefined)
 			material.uniforms.p0.value = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
-		if (material.uniforms.p1 !== undefined)
+		if (material.uniforms.p1 !== undefined && shader.uniforms.p1 !== undefined)
 			material.uniforms.p1.value = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
-		if (material.uniforms.p2 !== undefined)
+		if (material.uniforms.p2 !== undefined && shader.uniforms.p2 !== undefined)
 			material.uniforms.p2.value = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
-		if (material.uniforms.p3 !== undefined)
+		if (material.uniforms.p3 !== undefined && shader.uniforms.p3 !== undefined)
 			material.uniforms.p3.value = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
 	}
 

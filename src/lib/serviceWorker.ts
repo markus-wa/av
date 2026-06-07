@@ -4,7 +4,8 @@
  */
 
 let registration: ServiceWorkerRegistration | null = null;
-let isSubscribed = false;
+let updatesSubscribed = false;
+let messageListenerAttached = false;
 
 /**
  * Register the service worker
@@ -26,17 +27,15 @@ export async function registerServiceWorker(): Promise<void> {
 			return;
 		}
 
+		// Attach the message listener once, regardless of which path we take.
+		// Receiving messages does not require an active controller.
+		attachMessageListener();
+
 		// Check if already registered
 		const existingRegistration = await navigator.serviceWorker.getRegistration();
 		if (existingRegistration) {
 			registration = existingRegistration;
-			serviceWorker =
-				existingRegistration.active ||
-				existingRegistration.waiting ||
-				existingRegistration.installing;
 			console.log('[Service Worker Client] Using existing registration');
-
-			// Subscribe to updates
 			subscribeToUpdates(existingRegistration);
 			return;
 		}
@@ -47,12 +46,7 @@ export async function registerServiceWorker(): Promise<void> {
 		});
 
 		console.log('[Service Worker Client] Registered service worker');
-
-		// Subscribe to updates
 		subscribeToUpdates(registration);
-
-		// Set up message channel
-		setupMessageChannel();
 	} catch (error) {
 		console.error('[Service Worker Client] Registration failed:', error);
 	}
@@ -62,8 +56,8 @@ export async function registerServiceWorker(): Promise<void> {
  * Subscribe to service worker updates
  */
 function subscribeToUpdates(reg: ServiceWorkerRegistration): void {
-	if (isSubscribed) return;
-	isSubscribed = true;
+	if (updatesSubscribed) return;
+	updatesSubscribed = true;
 
 	reg.onupdatefound = () => {
 		const newWorker = reg.installing;
@@ -84,35 +78,24 @@ function subscribeToUpdates(reg: ServiceWorkerRegistration): void {
 
 			if (newWorker.state === 'activated') {
 				console.log('[Service Worker Client] New service worker activated');
-				serviceWorker = newWorker;
-				// Reload page to use new service worker
-				// window.location.reload();
 			}
 		};
 	};
 }
 
 /**
- * Set up message channel with service worker
+ * Attach the message listener from the service worker.
+ * Idempotent: only attaches once for the lifetime of the page.
  */
-function setupMessageChannel(): void {
-	if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+function attachMessageListener(): void {
+	if (messageListenerAttached) return;
+	if (!navigator.serviceWorker) return;
+	messageListenerAttached = true;
 
-	const messageChannel = new MessageChannel();
-
-	messageChannel.port1.onmessage = (event) => {
+	navigator.serviceWorker.addEventListener('message', (event) => {
 		console.log('[Service Worker Client] Message from service worker:', event.data);
 
-		if (event.data.type === 'CACHE_STATS') {
-			console.log('Cache stats:', event.data.data);
-		}
-	};
-
-	// Listen for messages from service worker
-	navigator.serviceWorker.addEventListener('message', (event) => {
-		console.log('[Service Worker Client] Direct message from service worker:', event.data);
-
-		if (event.data.type === 'CACHE_STATS') {
+		if (event.data?.type === 'CACHE_STATS') {
 			console.log('Cache stats:', event.data.data);
 		}
 	});
@@ -157,21 +140,34 @@ export function precachePlaylists(): void {
 }
 
 /**
- * Request cache statistics
+ * Request cache statistics.
+ * Rejects if there is no active controller, and times out so the
+ * promise can never hang indefinitely.
  */
-export function getCacheStats(): Promise<Record<string, unknown>> {
-	return new Promise((resolve) => {
+export function getCacheStats(timeoutMs = 5000): Promise<Record<string, unknown>> {
+	return new Promise((resolve, reject) => {
+		const controller = navigator.serviceWorker?.controller;
+		if (!controller) {
+			reject(new Error('[Service Worker Client] No active service worker'));
+			return;
+		}
+
 		const messageChannel = new MessageChannel();
 
+		const timer = setTimeout(() => {
+			messageChannel.port1.onmessage = null;
+			reject(new Error('[Service Worker Client] getCacheStats timed out'));
+		}, timeoutMs);
+
 		messageChannel.port1.onmessage = (event) => {
-			if (event.data.type === 'CACHE_STATS') {
+			if (event.data?.type === 'CACHE_STATS') {
+				clearTimeout(timer);
+				messageChannel.port1.onmessage = null;
 				resolve(event.data.data);
 			}
 		};
 
-		navigator.serviceWorker.controller?.postMessage({ type: 'GET_CACHE_STATS' }, [
-			messageChannel.port2
-		]);
+		controller.postMessage({ type: 'GET_CACHE_STATS' }, [messageChannel.port2]);
 	});
 }
 
@@ -194,9 +190,11 @@ export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegis
  * Unregister the service worker
  */
 export async function unregisterServiceWorker(): Promise<void> {
-	const registration = await getServiceWorkerRegistration();
-	if (registration) {
-		await registration.unregister();
+	const reg = await getServiceWorkerRegistration();
+	if (reg) {
+		await reg.unregister();
+		registration = null;
+		updatesSubscribed = false;
 		console.log('[Service Worker Client] Service worker unregistered');
 	}
 }

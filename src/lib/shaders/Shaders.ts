@@ -11,7 +11,7 @@ export const CRT = {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
 		p0: { value: 0.1 }, // scanline density
-		p1: { value: 0.0 }, // scanline speed
+		p1: { value: 1.0 }, // scanline speed
 		p2: { value: 0.1 }, // scanline intensity
 		p3: { value: 1.0 } // colour tint
 	},
@@ -110,7 +110,7 @@ export const Pixelation = {
 	uniforms: {
 		tDiffuse: { value: null },
 		time: { value: 0.0 },
-		p0: { value: 0.5 },
+		p0: { value: 0.5 }, // Pixelation amount
 		p1: { value: 0.5 },
 		p2: { value: 0.5 },
 		p3: { value: 0.5 }
@@ -129,7 +129,7 @@ export const Pixelation = {
 
     void main() {
       vec2 uv = vUv;
-      float p00 = mix(0.001, 0.02, p0);
+      float p00 = mix(0.001, 0.1, p0);
       vec2 resolution = vec2(textureSize(tDiffuse, 0));
       float aspectRatio = resolution.x / resolution.y;
       vec2 pixelSize = vec2(p00 / aspectRatio, p00);
@@ -197,7 +197,7 @@ export const EdgeDetection = {
     uniform float p0;
 
     void main() {
-      float edgeThreshold = mix(0.01, 1.0, p0);
+      float edgeThreshold = mix(0.01, 1.0, 1.0 - p0);
       vec2 resolution = vec2(textureSize(tDiffuse, 0));
       vec2 texel = vec2(1.0) / resolution;
       float Gx = 0.0;
