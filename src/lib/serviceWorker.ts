@@ -181,8 +181,8 @@ export function isServiceWorkerActive(): boolean {
 /**
  * Get the current service worker registration
  */
-export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
-	if (!navigator.serviceWorker) return null;
+export async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | undefined> {
+	if (!navigator.serviceWorker) return;
 	return await navigator.serviceWorker.getRegistration();
 }
 

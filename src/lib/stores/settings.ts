@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, type Writable } from 'svelte/store';
 
 interface AVSettings {
 	// Video settings
@@ -80,23 +80,6 @@ function getStoredSettings(): AVSettings {
 	return DEFAULT_SETTINGS;
 }
 
-function createPersistentStore<T>(key: string, startValue: T): Writable<T> {
-	const stored = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-	const store = writable(stored ? JSON.parse(stored) : startValue);
-
-	if (typeof window !== 'undefined') {
-		store.subscribe((value) => {
-			try {
-				localStorage.setItem(key, JSON.stringify(value));
-			} catch (error) {
-				console.error('Error saving to localStorage:', error);
-			}
-		});
-	}
-
-	return store;
-}
-
 // Main settings store - always initialize with DEFAULT_SETTINGS
 // getStoredSettings() already merges stored values with defaults
 const initialSettings = getStoredSettings();
@@ -145,19 +128,3 @@ export function updateMatrixSettings(updates: Partial<AVSettings['matrix']>) {
 export function resetSettings(): void {
 	settings.set(DEFAULT_SETTINGS);
 }
-
-// Individual stores for convenience (also persisted)
-export const videoMode = createPersistentStore<number>('video-mode', DEFAULT_SETTINGS.video.mode);
-export const loopVideos = createPersistentStore<boolean>(
-	'loop-videos',
-	DEFAULT_SETTINGS.video.loopVideos
-);
-export const shuffle = createPersistentStore<boolean>('shuffle', DEFAULT_SETTINGS.video.shuffle);
-export const cutVideo = createPersistentStore<boolean>(
-	'cut-video',
-	DEFAULT_SETTINGS.video.cutVideo
-);
-export const nextMediaIntervalSec = createPersistentStore<number>(
-	'next-media-interval',
-	DEFAULT_SETTINGS.video.nextMediaIntervalSec
-);

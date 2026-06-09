@@ -1,6 +1,13 @@
 /**
  * A/V Show Service Worker
  * Caches media files and API responses for offline performance
+ * 
+ * Improvements:
+ * - Memory-safe cache size tracking using content-length headers
+ * - LRU eviction based on access timestamps
+ * - TTL-based cache expiration
+ * - Efficient pre-caching with concurrency limits
+ * - Better error handling
  */
 
 /// <reference lib="webworker" />
@@ -39,6 +46,13 @@ const MAX_CACHE_SIZE = 500 * 1024 * 1024;
 // Maximum number of media files to cache
 const MAX_MEDIA_FILES = 100;
 
+// TTL in milliseconds
+const MEDIA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const API_TTL = 60 * 60 * 1000; // 1 hour
+
+// Maximum concurrent requests for pre-caching
+const MAX_CONCURRENT_REQUESTS = 6;
+
 // Type definitions for service worker events
 declare global {
 	interface ExtendableEvent extends Event {
@@ -46,20 +60,19 @@ declare global {
 	}
 
 	interface FetchEvent extends Event {
-		request: Request;
+		readonly request: Request;
 		respondWith(r: Promise<Response> | Response): Promise<void>;
 	}
 
 	interface ExtendableMessageEvent extends Event {
-		data: unknown;
-		source: MessageEventSource | null;
+		readonly data: any;
+		readonly source: Client | ServiceWorker | MessagePort | null;
 		waitUntil(f: Promise<unknown>): void;
 	}
-
-	interface MessageEventSource {
-		postMessage(message: unknown): void;
-	}
 }
+
+// In-memory cache for tracking access timestamps (URL -> timestamp)
+const accessTimestamps = new Map<string, number>();
 
 /**
  * Check if a URL is a media file
@@ -76,9 +89,28 @@ function isApiEndpoint(url: string): boolean {
 }
 
 /**
- * Get cache size in bytes
+ * Estimate response size from headers without loading body into memory
  */
-async function getCacheSize(cacheName: string): Promise<number> {
+function getResponseSize(response: Response): number {
+	const contentLength = response.headers.get('content-length');
+	if (contentLength) {
+		return parseInt(contentLength, 10);
+	}
+	// Fallback: estimate based on content type
+	const contentType = response.headers.get('content-type') || '';
+	if (contentType.includes('json')) {
+		return 1024;
+	}
+	if (contentType.includes('text')) {
+		return 4096;
+	}
+	return 1024 * 1024;
+}
+
+/**
+ * Get approximate cache size by summing content-length headers
+ */
+async function getApproximateCacheSize(cacheName: string): Promise<number> {
 	const cache = await caches.open(cacheName);
 	const keys = await cache.keys();
 
@@ -86,15 +118,49 @@ async function getCacheSize(cacheName: string): Promise<number> {
 	for (const request of keys) {
 		const response = await cache.match(request);
 		if (response) {
-			const body = await response.clone().arrayBuffer();
-			size += body.byteLength;
+			size += getResponseSize(response);
 		}
 	}
 	return size;
 }
 
 /**
- * Clean up old caches
+ * Check if a cached entry has expired based on TTL
+ */
+async function isEntryExpired(cacheName: string, request: Request): Promise<boolean> {
+	const cache = await caches.open(cacheName);
+	const response = await cache.match(request);
+	if (!response) return false;
+
+	const url = request.url;
+	const ttl = isMediaFile(url) ? MEDIA_TTL : API_TTL;
+	const cachedTime = accessTimestamps.get(url) || 0;
+	
+	return Date.now() - cachedTime > ttl;
+}
+
+/**
+ * Get cache entries sorted by access time (oldest first for LRU eviction)
+ */
+async function getEntriesSortedByAccess(cacheName: string): Promise<Array<{ request: Request; timestamp: number }>> {
+	const cache = await caches.open(cacheName);
+	const keys = await cache.keys();
+
+	return keys.map(request => ({
+		request,
+		timestamp: accessTimestamps.get(request.url) || 0
+	})).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
+ * Update access timestamp for a URL
+ */
+function updateAccessTimestamp(url: string): void {
+	accessTimestamps.set(url, Date.now());
+}
+
+/**
+ * Clean up old caches (versioned)
  */
 async function cleanupOldCaches(): Promise<void> {
 	const cacheKeys = await caches.keys();
@@ -110,25 +176,59 @@ async function cleanupOldCaches(): Promise<void> {
 }
 
 /**
- * Clean up cache if it exceeds maximum size
+ * Clean up expired entries based on TTL
+ */
+async function cleanupExpiredEntries(cacheName: string): Promise<number> {
+	const cache = await caches.open(cacheName);
+	const keys = await cache.keys();
+	
+	let deletedCount = 0;
+	for (const request of keys) {
+		if (await isEntryExpired(cacheName, request)) {
+			console.log(`Deleting expired entry: ${request.url}`);
+			await cache.delete(request);
+			accessTimestamps.delete(request.url);
+			deletedCount++;
+		}
+	}
+	return deletedCount;
+}
+
+/**
+ * Clean up cache if it exceeds maximum size using LRU eviction
  */
 async function cleanupCacheIfNeeded(cacheName: string): Promise<void> {
 	try {
-		const size = await getCacheSize(cacheName);
+		// First, clean up expired entries
+		const expiredDeleted = await cleanupExpiredEntries(cacheName);
+		if (expiredDeleted > 0) {
+			console.log(`Deleted ${expiredDeleted} expired entries from ${cacheName}`);
+		}
+
+		const size = await getApproximateCacheSize(cacheName);
 
 		if (size < MAX_CACHE_SIZE) return;
 
 		console.log(`Cache ${cacheName} exceeds max size (${MAX_CACHE_SIZE} bytes), cleaning up...`);
 
 		const cache = await caches.open(cacheName);
-		const keys = await cache.keys();
+		const entries = await getEntriesSortedByAccess(cacheName);
 
-		// Delete oldest entries (simple FIFO approach)
-		const deleteCount = Math.max(1, Math.floor(keys.length * 0.2));
-		for (let i = 0; i < deleteCount && i < keys.length; i++) {
-			const key = keys[i];
-			console.log(`Deleting cached entry: ${key.url}`);
-			await cache.delete(key);
+		// For media cache, also enforce file count limit
+		const maxFiles = cacheName === MEDIA_CACHE_NAME ? MAX_MEDIA_FILES : Number.POSITIVE_INFINITY;
+
+		let filesToDelete = Math.max(1, Math.floor(entries.length * 0.2));
+		
+		if (entries.length > maxFiles) {
+			filesToDelete = Math.max(filesToDelete, entries.length - maxFiles);
+		}
+
+		// Delete oldest entries first (LRU)
+		for (let i = 0; i < filesToDelete && i < entries.length; i++) {
+			const entry = entries[i];
+			console.log(`Deleting cached entry (LRU): ${entry.request.url}`);
+			await cache.delete(entry.request);
+			accessTimestamps.delete(entry.request.url);
 		}
 	} catch (error) {
 		console.error(`Error cleaning up cache ${cacheName}:`, error);
@@ -136,13 +236,41 @@ async function cleanupCacheIfNeeded(cacheName: string): Promise<void> {
 }
 
 /**
- * Cache media files from playlists
+ * Simple semaphore for concurrency control
+ */
+function createSemaphore(maxConcurrent: number) {
+	let current = 0;
+	const waiting: Array<() => void> = [];
+
+	return {
+		acquire: () => {
+			return new Promise<void>((resolve) => {
+				if (current < maxConcurrent) {
+					current++;
+					resolve();
+				} else {
+					waiting.push(resolve);
+				}
+			});
+		},
+		release: () => {
+			current--;
+			if (waiting.length > 0) {
+				const next = waiting.shift()!;
+				current++;
+				next();
+			}
+		}
+	};
+}
+
+/**
+ * Cache media files from playlists with concurrency control
  */
 async function precacheMediaFromPlaylists(): Promise<void> {
 	try {
 		const cache = await caches.open(MEDIA_CACHE_NAME);
 
-		// Fetch playlists
 		const response = await fetch('/api/playlists');
 		if (!response.ok) {
 			console.warn('Failed to fetch playlists for precaching');
@@ -151,7 +279,6 @@ async function precacheMediaFromPlaylists(): Promise<void> {
 
 		const playlists = await response.json();
 
-		// Extract all media URLs
 		const mediaUrls: string[] = [];
 		for (const playlist of playlists) {
 			if (playlist.entries) {
@@ -166,50 +293,99 @@ async function precacheMediaFromPlaylists(): Promise<void> {
 			}
 		}
 
-		// Pre-cache media files
+		const semaphore = createSemaphore(MAX_CONCURRENT_REQUESTS);
+
 		const existingKeys = await cache.keys();
 		const existingUrls = new Set(existingKeys.map((k) => k.url));
 
 		let cachedCount = 0;
+		const errors: string[] = [];
+
 		for (const url of mediaUrls) {
-			// Check if already cached
 			if (existingUrls.has(url)) {
 				continue;
 			}
 
 			try {
-				// Only cache if it's a same-origin request
 				const fullUrl = new URL(url, self.location.origin).href;
 
-				// Try HEAD request first to check if file exists
-				const headResponse = await fetch(fullUrl, {
-					method: 'HEAD',
-					cache: 'no-store'
-				});
+				await semaphore.acquire();
 
-				if (headResponse.ok) {
-					// Use cache API to store
-					const cacheResponse = await fetch(fullUrl);
-					if (cacheResponse.ok) {
+				const stillExists = await cache.match(fullUrl);
+				if (stillExists) {
+					semaphore.release();
+					continue;
+				}
+
+				const cacheResponse = await fetch(fullUrl, { cache: 'no-store' });
+				
+				if (cacheResponse.ok) {
+					const currentSize = await getApproximateCacheSize(MEDIA_CACHE_NAME);
+					const entrySize = getResponseSize(cacheResponse);
+					
+					if (currentSize + entrySize <= MAX_CACHE_SIZE) {
 						await cache.put(fullUrl, cacheResponse.clone());
+						updateAccessTimestamp(fullUrl);
 						cachedCount++;
 						console.log(`Pre-cached media: ${url}`);
+					} else {
+						console.warn(`Skipping cache for ${url} - would exceed size limit`);
 					}
+				} else {
+					console.warn(`Failed to fetch for caching: ${url} (${cacheResponse.status})`);
 				}
 			} catch (error) {
+				errors.push(url);
 				console.warn(`Failed to pre-cache: ${url}`, error);
+			} finally {
+				semaphore.release();
 			}
 
-			// Check cache size limit
 			if (cachedCount >= MAX_MEDIA_FILES) break;
 		}
 
-		console.log(`Pre-cached ${cachedCount} media files`);
+		cleanupCacheIfNeeded(MEDIA_CACHE_NAME).catch(() => {});
 
-		// Clean up if needed
-		await cleanupCacheIfNeeded(MEDIA_CACHE_NAME);
+		if (errors.length > 0) {
+			console.warn(`Pre-caching completed with ${errors.length} errors`);
+		}
+		console.log(`Pre-cached ${cachedCount} media files`);
 	} catch (error) {
 		console.error('Failed to pre-cache media from playlists:', error);
+	}
+}
+
+/**
+ * Cache a specific media file
+ */
+async function cacheMediaFile(url: string): Promise<void> {
+	try {
+		const cache = await caches.open(MEDIA_CACHE_NAME);
+		const fullUrl = new URL(url, self.location.origin).href;
+
+		const existing = await cache.match(fullUrl);
+		if (existing && !(await isEntryExpired(MEDIA_CACHE_NAME, new Request(fullUrl)))) {
+			console.log(`[Service Worker] Already cached and valid: ${url}`);
+			updateAccessTimestamp(fullUrl);
+			return;
+		}
+
+		const currentSize = await getApproximateCacheSize(MEDIA_CACHE_NAME);
+
+		const response = await fetch(fullUrl, { cache: 'no-store' });
+		if (response.ok) {
+			const entrySize = getResponseSize(response);
+			if (currentSize + entrySize <= MAX_CACHE_SIZE) {
+				console.log(`[Service Worker] Caching: ${url}`);
+				await cache.put(fullUrl, response.clone());
+				updateAccessTimestamp(fullUrl);
+				await cleanupCacheIfNeeded(MEDIA_CACHE_NAME);
+			} else {
+				console.warn(`[Service Worker] Skipping cache for ${url} - would exceed size limit`);
+			}
+		}
+	} catch (error) {
+		console.error(`[Service Worker] Failed to cache ${url}:`, error);
 	}
 }
 
@@ -221,14 +397,15 @@ self.addEventListener('install', (event: ExtendableEvent) => {
 
 	event.waitUntil(
 		Promise.all([
-			// Pre-cache build assets
 			caches.open(CACHE_NAME).then((cache) => {
 				console.log('[Service Worker] Caching build files');
-				return cache.addAll(build.map((file) => `/${file}`));
+				return cache.addAll(build.map((file) => `/${file}`)).catch(e => {
+					console.error('[Service Worker] Build cache failed:', e);
+				});
 			}),
-			// Pre-cache media from playlists
-			precacheMediaFromPlaylists(),
-			// Skip waiting to activate immediately
+			precacheMediaFromPlaylists().catch((error) => {
+				console.error('[Service Worker] Precache failed (non-blocking):', error);
+			}),
 			self.skipWaiting()
 		]).catch((error) => {
 			console.error('[Service Worker] Install failed:', error);
@@ -257,7 +434,6 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 		const url = new URL(event.request.url);
 		const path = url.pathname;
 
-		// Skip non-GET requests
 		if (event.request.method !== 'GET') {
 			return;
 		}
@@ -266,28 +442,36 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 		if (isApiEndpoint(path)) {
 			event.respondWith(
 				fetch(event.request)
-					.then((response) => {
-						// Clone and cache successful responses
+					.then(async (response) => {
 						if (response.ok) {
 							const responseClone = response.clone();
-							caches.open(PLAYLIST_CACHE_NAME).then((cache) => {
-								cache
-									.put(event.request, responseClone)
-									.catch((e) => console.error('Cache put failed:', e));
-							});
+							const cache = await caches.open(PLAYLIST_CACHE_NAME);
+							try {
+								const currentSize = await getApproximateCacheSize(PLAYLIST_CACHE_NAME);
+								const entrySize = getResponseSize(responseClone);
+								if (currentSize + entrySize <= MAX_CACHE_SIZE) {
+									await cache.put(event.request, responseClone);
+									updateAccessTimestamp(event.request.url);
+									console.log(`[Service Worker] Cached API response: ${path}`);
+								}
+							} catch (e) {
+								console.error('[Service Worker] API cache put failed:', e);
+							}
 						}
 						return response;
 					})
-					.catch(() => {
-						// Fallback to cache
-						return caches.match(event.request).then((response) => {
-							return (
-								response ||
-								new Response('Offline - API unavailable', {
-									status: 503,
-									statusText: 'Service Unavailable'
-								})
-							);
+					.catch(async () => {
+						const cache = await caches.open(PLAYLIST_CACHE_NAME);
+						const cachedResponse = await cache.match(event.request);
+						
+						if (cachedResponse) {
+							updateAccessTimestamp(event.request.url);
+							return cachedResponse;
+						}
+						
+						return new Response('Offline - API unavailable', {
+							status: 503,
+							statusText: 'Service Unavailable'
 						});
 					})
 			);
@@ -298,25 +482,32 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 		if (isMediaFile(path)) {
 			event.respondWith(
 				caches.open(MEDIA_CACHE_NAME).then((cache) => {
-					return cache.match(event.request).then((cachedResponse) => {
-						// Return cached response if available
-						if (cachedResponse) {
+					return cache.match(event.request).then(async (cachedResponse) => {
+						if (cachedResponse && !(await isEntryExpired(MEDIA_CACHE_NAME, event.request))) {
+							updateAccessTimestamp(event.request.url);
 							console.log(`[Service Worker] Serving ${path} from cache`);
 							return cachedResponse;
 						}
 
-						// Otherwise fetch from network
-						return fetch(event.request).then((response) => {
-							// Cache the response
+						return fetch(event.request).then(async (response) => {
 							if (response.ok) {
 								console.log(`[Service Worker] Caching ${path} from network`);
 								const responseClone = response.clone();
-								cache
-									.put(event.request, responseClone)
-									.catch((e) => console.error('Cache put failed:', e));
-
-								// Clean up if cache is getting large
-								cleanupCacheIfNeeded(MEDIA_CACHE_NAME);
+								
+								const currentSize = await getApproximateCacheSize(MEDIA_CACHE_NAME);
+								const entrySize = getResponseSize(responseClone);
+								
+								if (currentSize + entrySize <= MAX_CACHE_SIZE) {
+									try {
+										await cache.put(event.request, responseClone);
+										updateAccessTimestamp(event.request.url);
+									} catch (e) {
+										console.error('[Service Worker] Media cache put failed:', e);
+									}
+									cleanupCacheIfNeeded(MEDIA_CACHE_NAME).catch(() => {});
+								} else {
+									console.warn(`[Service Worker] Skipping cache for ${path} - would exceed size limit`);
+								}
 							}
 							return response;
 						});
@@ -337,7 +528,6 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 			return;
 		}
 
-		// Default: Network only
 	} catch (error) {
 		console.error('[Service Worker] Fetch handler error:', error);
 	}
@@ -358,7 +548,7 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
 			event.waitUntil(
 				Promise.all([caches.delete(MEDIA_CACHE_NAME), caches.delete(PLAYLIST_CACHE_NAME)])
 					.then(() => {
-						// Recreate caches
+						accessTimestamps.clear();
 						return Promise.all([caches.open(MEDIA_CACHE_NAME), caches.open(PLAYLIST_CACHE_NAME)]);
 					})
 					.catch((error) => {
@@ -377,8 +567,8 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
 
 		if (event.data && event.data.type === 'GET_CACHE_STATS') {
 			Promise.all([
-				getCacheSize(MEDIA_CACHE_NAME),
-				getCacheSize(PLAYLIST_CACHE_NAME),
+				getApproximateCacheSize(MEDIA_CACHE_NAME),
+				getApproximateCacheSize(PLAYLIST_CACHE_NAME),
 				caches.keys()
 			]).then(([mediaSize, playlistSize, cacheNames]) => {
 				event.source?.postMessage({
@@ -388,7 +578,9 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
 						playlistSize,
 						cacheNames,
 						mediaCacheName: MEDIA_CACHE_NAME,
-						playlistCacheName: PLAYLIST_CACHE_NAME
+						playlistCacheName: PLAYLIST_CACHE_NAME,
+						mediaFileCount: MAX_MEDIA_FILES,
+						maxCacheSize: MAX_CACHE_SIZE
 					}
 				});
 			});
@@ -399,37 +591,12 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
 });
 
 /**
- * Cache a specific media file
- */
-async function cacheMediaFile(url: string): Promise<void> {
-	try {
-		const cache = await caches.open(MEDIA_CACHE_NAME);
-		const fullUrl = new URL(url, self.location.origin).href;
-
-		// Check if already cached
-		const existing = await cache.match(fullUrl);
-		if (existing) {
-			console.log(`[Service Worker] Already cached: ${url}`);
-			return;
-		}
-
-		// Fetch and cache
-		const response = await fetch(fullUrl);
-		if (response.ok) {
-			console.log(`[Service Worker] Caching: ${url}`);
-			await cache.put(fullUrl, response.clone());
-			await cleanupCacheIfNeeded(MEDIA_CACHE_NAME);
-		}
-	} catch (error) {
-		console.error(`[Service Worker] Failed to cache ${url}:`, error);
-	}
-}
-
-/**
  * Periodic cache cleanup (every hour)
  */
 setInterval(
 	() => {
+		cleanupExpiredEntries(MEDIA_CACHE_NAME).catch(() => {});
+		cleanupExpiredEntries(PLAYLIST_CACHE_NAME).catch(() => {});
 		cleanupCacheIfNeeded(MEDIA_CACHE_NAME).catch(() => {});
 		cleanupCacheIfNeeded(PLAYLIST_CACHE_NAME).catch(() => {});
 	},
