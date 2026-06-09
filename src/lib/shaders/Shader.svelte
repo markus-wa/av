@@ -40,7 +40,7 @@
 		Glitch,
 		Feedback,
 		NeonGrid,
-		WaveformRipple,
+		WaveformRipple
 	];
 
 	// Get settings from store

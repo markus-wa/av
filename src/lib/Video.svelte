@@ -61,7 +61,7 @@
 		// Handle media initialization directly within user gesture context
 		if (mode === 0) {
 			cleanupMedia();
-			console.log(devicesIds, selectedDeviceId)
+			console.log(devicesIds, selectedDeviceId);
 			if (selectedDeviceId === 'screen') {
 				startScreenCapture();
 			} else {
@@ -134,19 +134,19 @@
 
 		nextMediaInterval = setInterval(nextMedia, t);
 
-		console.log(`nextMediaInterval (ms): ${t}`)
+		console.log(`nextMediaInterval (ms): ${t}`);
 	}
 
 	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
 	function handleParamsChange(p0: number, _p1: number, p2: number): void {
-		console.log(`handleParamsChange: ${p0} ${p2}`)
+		console.log(`handleParamsChange: ${p0} ${p2}`);
 		// Only update if value actually changed to avoid recreating interval
 		const newNextMediaIntervalSec = 1 + Math.floor(p0 * 9);
 
 		// make playback speed be 1 if either p2 = 0 or 1, make speed be 0.1 if p2 = 0.25, and make it be 10 if p2 = 0.25 - using a sinus curve to interpolate in between
 		const mult = p2 === 1 ? 0 : 9 * Math.sin(p2 * Math.PI * 2);
 
-		const newPlaybackRate = 1 + (mult > 0 ? mult : mult/10);
+		const newPlaybackRate = 1 + (mult > 0 ? mult : mult / 10);
 
 		if (newNextMediaIntervalSec !== nextMediaIntervalSec) {
 			updateNextMediaInterval(newNextMediaIntervalSec);
@@ -365,7 +365,9 @@
 		const hls = new Hls();
 		hlsInstance = hls;
 
-		hls.loadSource('https://matchmaker.live.bidi.net.uk/vs-cmaf-pushb-uk/x=4/i=urn:bbc:pips:service:bbc_four_hd/pc_hd_abr_v2.fmp4.m3u8');
+		hls.loadSource(
+			'https://matchmaker.live.bidi.net.uk/vs-cmaf-pushb-uk/x=4/i=urn:bbc:pips:service:bbc_four_hd/pc_hd_abr_v2.fmp4.m3u8'
+		);
 		hls.attachMedia(videoElement);
 		hls.on(Hls.Events.MANIFEST_PARSED, function () {
 			videoElement!.play().catch((e) => console.error('HLS playback error:', e));

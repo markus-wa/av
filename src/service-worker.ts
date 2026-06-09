@@ -1,7 +1,7 @@
 /**
  * A/V Show Service Worker
  * Caches media files and API responses for offline performance
- * 
+ *
  * Improvements:
  * - Memory-safe cache size tracking using content-length headers
  * - LRU eviction based on access timestamps
@@ -135,21 +135,25 @@ async function isEntryExpired(cacheName: string, request: Request): Promise<bool
 	const url = request.url;
 	const ttl = isMediaFile(url) ? MEDIA_TTL : API_TTL;
 	const cachedTime = accessTimestamps.get(url) || 0;
-	
+
 	return Date.now() - cachedTime > ttl;
 }
 
 /**
  * Get cache entries sorted by access time (oldest first for LRU eviction)
  */
-async function getEntriesSortedByAccess(cacheName: string): Promise<Array<{ request: Request; timestamp: number }>> {
+async function getEntriesSortedByAccess(
+	cacheName: string
+): Promise<Array<{ request: Request; timestamp: number }>> {
 	const cache = await caches.open(cacheName);
 	const keys = await cache.keys();
 
-	return keys.map(request => ({
-		request,
-		timestamp: accessTimestamps.get(request.url) || 0
-	})).sort((a, b) => a.timestamp - b.timestamp);
+	return keys
+		.map((request) => ({
+			request,
+			timestamp: accessTimestamps.get(request.url) || 0
+		}))
+		.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /**
@@ -181,7 +185,7 @@ async function cleanupOldCaches(): Promise<void> {
 async function cleanupExpiredEntries(cacheName: string): Promise<number> {
 	const cache = await caches.open(cacheName);
 	const keys = await cache.keys();
-	
+
 	let deletedCount = 0;
 	for (const request of keys) {
 		if (await isEntryExpired(cacheName, request)) {
@@ -218,7 +222,7 @@ async function cleanupCacheIfNeeded(cacheName: string): Promise<void> {
 		const maxFiles = cacheName === MEDIA_CACHE_NAME ? MAX_MEDIA_FILES : Number.POSITIVE_INFINITY;
 
 		let filesToDelete = Math.max(1, Math.floor(entries.length * 0.2));
-		
+
 		if (entries.length > maxFiles) {
 			filesToDelete = Math.max(filesToDelete, entries.length - maxFiles);
 		}
@@ -318,11 +322,11 @@ async function precacheMediaFromPlaylists(): Promise<void> {
 				}
 
 				const cacheResponse = await fetch(fullUrl, { cache: 'no-store' });
-				
+
 				if (cacheResponse.ok) {
 					const currentSize = await getApproximateCacheSize(MEDIA_CACHE_NAME);
 					const entrySize = getResponseSize(cacheResponse);
-					
+
 					if (currentSize + entrySize <= MAX_CACHE_SIZE) {
 						await cache.put(fullUrl, cacheResponse.clone());
 						updateAccessTimestamp(fullUrl);
@@ -399,7 +403,7 @@ self.addEventListener('install', (event: ExtendableEvent) => {
 		Promise.all([
 			caches.open(CACHE_NAME).then((cache) => {
 				console.log('[Service Worker] Caching build files');
-				return cache.addAll(build.map((file) => `/${file}`)).catch(e => {
+				return cache.addAll(build.map((file) => `/${file}`)).catch((e) => {
 					console.error('[Service Worker] Build cache failed:', e);
 				});
 			}),
@@ -463,12 +467,12 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 					.catch(async () => {
 						const cache = await caches.open(PLAYLIST_CACHE_NAME);
 						const cachedResponse = await cache.match(event.request);
-						
+
 						if (cachedResponse) {
 							updateAccessTimestamp(event.request.url);
 							return cachedResponse;
 						}
-						
+
 						return new Response('Offline - API unavailable', {
 							status: 503,
 							statusText: 'Service Unavailable'
@@ -493,10 +497,10 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 							if (response.ok) {
 								console.log(`[Service Worker] Caching ${path} from network`);
 								const responseClone = response.clone();
-								
+
 								const currentSize = await getApproximateCacheSize(MEDIA_CACHE_NAME);
 								const entrySize = getResponseSize(responseClone);
-								
+
 								if (currentSize + entrySize <= MAX_CACHE_SIZE) {
 									try {
 										await cache.put(event.request, responseClone);
@@ -506,7 +510,9 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 									}
 									cleanupCacheIfNeeded(MEDIA_CACHE_NAME).catch(() => {});
 								} else {
-									console.warn(`[Service Worker] Skipping cache for ${path} - would exceed size limit`);
+									console.warn(
+										`[Service Worker] Skipping cache for ${path} - would exceed size limit`
+									);
 								}
 							}
 							return response;
@@ -527,7 +533,6 @@ self.addEventListener('fetch', (event: FetchEvent) => {
 			);
 			return;
 		}
-
 	} catch (error) {
 		console.error('[Service Worker] Fetch handler error:', error);
 	}
