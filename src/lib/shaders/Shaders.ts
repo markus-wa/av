@@ -498,7 +498,7 @@ export const NeonGrid = {
 
     void main() {
       vec2 uv = vUv;
-      float horizon = p2;
+      float horizon = (1.0 - p3);
       
       // Get base color from texture
       vec4 baseColor = texture2D(tDiffuse, uv);
@@ -525,7 +525,7 @@ export const NeonGrid = {
       vec3 gcol = mix(NEON_PURPLE, NEON_PINK, clamp(uv.y / horizon, 0.0, 1.0));
       // Apply neon as subtle hue on grid, mix with base
       float gridMask = core + glow * 0.4;
-      vec3 neonGlow = gcol * gridMask * p3 * 0.7;
+      vec3 neonGlow = gcol * gridMask * p2 * 0.7;
       
       vec3 outCol = baseColor.rgb + neonGlow;
       outCol = min(outCol, vec3(1.0));
