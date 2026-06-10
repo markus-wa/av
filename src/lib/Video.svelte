@@ -173,9 +173,14 @@
 	$: shuffleOrder = generateShuffleOrder(playlist?.entries?.length || 0);
 	$: isVideo = !testMode && (mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4')));
 
+	let lastMediaElement: HTMLVideoElement | HTMLImageElement | null = null;
+
 	$: {
-		if (onMediaChange && ((isVideo && videoElement) || (!isVideo && imgElement))) {
-			onMediaChange(isVideo ? videoElement! : imgElement!);
+		const element = isVideo ? videoElement : imgElement;
+		if (onMediaChange && element && element !== lastMediaElement) {
+			onMediaChange(element);
+			// eslint-disable-next-line no-useless-assignment
+			lastMediaElement = element;
 		}
 	}
 
