@@ -132,15 +132,17 @@
 
 	let nextMediaInterval: ReturnType<typeof setInterval>;
 
-	function setupNextMediaInterval(t: number) {
+	function setupNextMediaInterval(sec: number) {
 		if (nextMediaInterval) {
 			clearInterval(nextMediaInterval);
 		}
 
-		nextMediaInterval = setInterval(nextMedia, t);
+		nextMediaInterval = setInterval(onNextMediaInterval, sec*1000);
 
-		console.log(`nextMediaInterval (ms): ${t}`);
+		console.log(`nextMediaInterval (sec): ${sec}`);
 	}
+
+	$: setupNextMediaInterval(nextMediaIntervalSec)
 
 	// newNextMediaIntervalSec is 0 to 1 but translated to 1 to 10
 	function handleParamsChange(p0: number, _p1: number, p2: number): void {
@@ -155,8 +157,6 @@
 
 		if (newNextMediaIntervalSec !== nextMediaIntervalSec) {
 			updateNextMediaInterval(newNextMediaIntervalSec);
-			// Recreate interval with new timing
-			setupNextMediaInterval(nextMediaIntervalSec * 1000);
 		}
 
 		if (newPlaybackRate !== playbackRate) {
@@ -485,7 +485,7 @@
 	}
 
 	function nextMedia() {
-		if (mode === 2 && (!isVideo || cutVideo || loopVideos)) {
+		if (mode === 2) {
 			if (shuffle) {
 				nextShuffleMedia();
 			} else {
@@ -494,8 +494,14 @@
 		}
 	}
 
+	function onNextMediaInterval() {
+		if (!cutVideo) return;
+
+		nextMedia();
+	}
+
 	function prevMedia() {
-		if (mode === 2 && (!isVideo || cutVideo)) {
+		if (mode === 2) {
 			if (shuffle) {
 				prevShuffleMedia();
 			} else {
@@ -506,7 +512,6 @@
 
 	onMount(() => {
 		reload();
-		setupNextMediaInterval(nextMediaIntervalSec * 1000);
 	});
 
 	onDestroy(() => {
