@@ -7,6 +7,7 @@
 	import SwitchPro from '$lib/Controllers';
 	import MatrixSwitcher from '$lib/matrix/MatrixSwitcher.svelte';
 	import Gamepad from '$lib/Gamepad.svelte';
+	import { resetSettings } from '$lib/stores';
 
 	let videoComponent: Video;
 	let midiComponent: MIDI;
@@ -17,11 +18,27 @@
 	let controlledComponents: ControlledComponent[];
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let shiftPressed: boolean = false;
+	let sticksPressed = 0;
 	let enableDebugTimeout: number;
 	let enableTestTimeout: number;
+	let resetTimeout: number;
 	let paused = false;
 	let testMode = false;
 	let debugMode = false;
+
+	$: if (sticksPressed === (1|2)) {
+		clearTimeout(enableDebugTimeout)
+		clearTimeout(enableTestTimeout)
+		clearTimeout(resetTimeout)
+
+		// eslint-disable-next-line no-useless-assignment
+		resetTimeout = setTimeout(() => {
+			resetSettings();
+			toast(`Settings RESET!`);
+		}, 3000) as unknown as number;
+	} else {
+		clearTimeout(resetTimeout)
+	}
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log('Media changed:', element);
@@ -96,6 +113,7 @@
 
 		if (index === SwitchPro.RIGHT_STICK) {
 			if (pressed) {
+				sticksPressed = sticksPressed | 1;
 				clearTimeout(enableDebugTimeout);
 				enableDebugTimeout = setTimeout(() => {
 					debugMode = !debugMode;
@@ -103,6 +121,7 @@
 					toast(`Debug ${debugMode ? 'ON' : 'OFF'}`);
 				}, 3000) as unknown as number;
 			} else {
+				sticksPressed = sticksPressed & ~1;
 				clearTimeout(enableDebugTimeout);
 			}
 
@@ -111,6 +130,7 @@
 
 		if (index === SwitchPro.LEFT_STICK) {
 			if (pressed) {
+				sticksPressed = sticksPressed | 2;
 				clearTimeout(enableTestTimeout);
 				enableTestTimeout = setTimeout(() => {
 					testMode = !testMode;
@@ -118,6 +138,7 @@
 					toast(`Test ${testMode ? 'ON' : 'OFF'}`);
 				}, 3000) as unknown as number;
 			} else {
+				sticksPressed = sticksPressed & ~2;
 				clearTimeout(enableTestTimeout);
 			}
 
