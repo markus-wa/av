@@ -1,0 +1,14 @@
+[
+	{
+		"name": "laut.fm Hyperpop",
+		"src": "/api/radio/lautfm-hyperpop"
+	},
+	{
+		"name": "HitMusic80s",
+		"hls": "https://hls-a01-uk.autopo.st/hls/public/hitmusic80s/aac_320k_aac.m3u8"
+	},
+	{
+		"name": "BCfm",
+		"src": "/api/radio/bcfm.mp3"
+	}
+]

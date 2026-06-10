@@ -3,28 +3,94 @@
 	import { toast } from 'svelte-french-toast';
 	import Hls from 'hls.js';
 
-	let audioElement: HTMLAudioElement | null = null;
-	let audioHlsInstance: Hls | null = null;
+	type Source = {
+		name: string;
+		src: string | undefined;
+		hls: string | undefined;
+		device: MediaDeviceInfo | undefined;
+	};
 
+	export let audioElement: HTMLAudioElement | null = null;
+	export let paused = false;
+	let hls: Hls | undefined;
 
-	export function onAxesStateChange(_axes: ReadonlyArray<number>): void {
+	let streams: Source[] | undefined;
+	let devices: Source[] | undefined;
+
+	let device: MediaStream | undefined;
+
+	$: sources = (streams && devices && [...streams, ...devices]) || [];
+	let source: Source | undefined;
+	let selectedSourceIndex = 0;
+
+	async function selectSource(newSource: Source) {
+		if (newSource == source) return;
+
+		source = newSource;
+
+		console.log('Selecting source:', source);
+
+		if (source.src) {
+			audioElement!.src = source.src;
+		} else if (source.hls) {
+			playHLS(source.hls);
+		} else if (source.device) {
+			playDevice(source.device.deviceId);
+		}
 	}
 
-	export function onButtonStateChange(_buttonIndex: number, _isPressed: boolean): void {
+	$: if (sources?.length > 0) {
+		console.log('Sources changed:', sources);
+
+		selectSource(sources[selectedSourceIndex]);
 	}
 
-	function startAudioHLS() {
+	async function playDevice(deviceId: string) {
+		device = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: deviceId } });
+
+		// play audio from device
+		audioElement!.srcObject = device;
+	}
+
+	async function initDevices() {
+		try {
+			const devs = (await navigator.mediaDevices.enumerateDevices()).filter(
+				(d) => d.kind === 'audioinput'
+			);
+			console.log('Audio devices:', devs);
+
+			devices = devs.map((d) => ({ name: d.label, src: undefined, hls: undefined, device: d }));
+		} catch (error) {
+			console.error('Error initializing audio:', error);
+		}
+	}
+
+	export function onAxesStateChange(_axes: ReadonlyArray<number>): void {}
+
+	export function onButtonStateChange(_buttonIndex: number, _isPressed: boolean): void {}
+
+	async function loadStreams() {
+		try {
+			const resp = await fetch('/audio-streams.json');
+			streams = await resp.json();
+			console.log('Audio streams loaded:', streams);
+		} catch (error) {
+			console.error('Error loading playlists:', error);
+			toast('Error loading playlists');
+		}
+	}
+
+	function playHLS(source: string) {
 		if (!audioElement) return;
 
-		if (audioHlsInstance) {
-			audioHlsInstance.destroy();
+		if (hls) {
+			hls.destroy();
 		}
 
 		if (Hls.isSupported()) {
-			const hls = new Hls();
-			audioHlsInstance = hls;
+			hls = new Hls();
 			console.log('Audio HLS supported');
-			hls.loadSource('/api/audio-proxy/bcfm/live.mp3.m3u8');
+			hls.loadSource(source);
 			hls.attachMedia(audioElement);
 			hls.on(Hls.Events.MANIFEST_PARSED, () => {
 				console.log('Audio HLS manifest parsed');
@@ -39,33 +105,28 @@
 			});
 		} else if (audioElement.canPlayType('application/vnd.apple.mpegurl')) {
 			// Native HLS support (Safari)
-			audioElement.src = '/api/audio-proxy/bcfm/live.mp3.m3u8';
+			audioElement.src = source;
 			audioElement.play().catch((e) => console.error('Native audio HLS error:', e));
 		}
 	}
 
-	function setPaused(paused: boolean) {
-		if (audioElement) {
-			if (paused) {
-				audioElement.pause();
-			} else {
-				audioElement.play().catch((e) => console.error('Audio play error:', e));
-			}
-		}
+	$: if (paused) {
+		audioElement?.pause();
+	} else {
+		audioElement?.play().catch((e) => console.error('Audio play error:', e));
 	}
 
 	onMount(() => {
-		startAudioHLS();
+		loadStreams();
+		initDevices();
 	});
 
 	onDestroy(() => {
-		if (audioHlsInstance) {
-			audioHlsInstance.destroy();
-			audioHlsInstance = null;
+		if (hls) {
+			hls.destroy();
+			hls = undefined;
 		}
 	});
-
-	export { audioElement, setPaused };
 </script>
 
-<audio bind:this={audioElement} src="http://hydra.shoutca.st:8268/live.mp3" preload="auto" autoplay crossorigin="anonymous"></audio>
+<audio bind:this={audioElement} preload="auto" autoplay crossorigin="anonymous"></audio>

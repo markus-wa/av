@@ -12,6 +12,8 @@
 	} from '$lib/matrix/Paths';
 	import { settings, updateMatrixSettings } from '$lib/stores/settings';
 
+	export let paused = false;
+
 	let matrixSwitcher: HomerunMatrixSwitcher = new HomerunMatrixSwitcher();
 	let nSwitches: number = 0;
 	let paths = [pathABAB, pathCycleAB, pathAABBAABB, pathRandomSome, pathRandomAll];
@@ -19,7 +21,7 @@
 	// Get settings from store
 	$: matrixSettings = $settings.matrix;
 	$: pathIndex = matrixSettings.pathIndex;
-	$: isManual = matrixSettings.isManual;
+	$: isManual = paused || matrixSettings.isManual;
 	let lastManualSwitchAt = new Date().getMilliseconds();
 	let showModal = false;
 	let hideTimer: ReturnType<typeof setTimeout>;
@@ -35,10 +37,6 @@
 
 	function updateIsManual(newValue: boolean) {
 		updateMatrixSettings({ isManual: newValue });
-	}
-
-	export function setPaused(paused: boolean): void {
-		updateIsManual(paused);
 	}
 
 	async function preparePath(): Promise<void> {

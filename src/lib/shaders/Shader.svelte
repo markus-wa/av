@@ -17,10 +17,23 @@
 	import SwitchPro from '$lib/Controllers';
 	import { UniformsUtils } from 'three';
 	import { settings, updateShaderSettings } from '$lib/stores/settings';
-	import { debugMode } from '$lib/stores';
 	import { toast } from 'svelte-french-toast';
+	import { watch } from '$lib/utils.svelte';
 
 	export let mediaElement: HTMLVideoElement | HTMLImageElement | null = null;
+	export let paused = false;
+	export let debugMode = false;
+	export let testMode = false;
+	$: stopped = paused || testMode;
+
+	watch(
+		() => stopped,
+		(wasPaused) => {
+			if (wasPaused && !stopped) {
+				animationFrameId = requestAnimationFrame(animate);
+			}
+		}
+	);
 
 	let renderer: THREE.WebGLRenderer | null = null;
 	let scene: THREE.Scene | null = null;
@@ -32,8 +45,8 @@
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
 	const shaders: Shader[] = [
-		ColorGrading,
 		CRT,
+		ColorGrading,
 		EdgeDetection,
 		ChromaticAberration,
 		Pixelation,
@@ -46,26 +59,17 @@
 	// Get settings from store
 	$: shaderSettings = $settings.shader;
 	$: shaderIndex = shaderSettings.shaderIndex;
-	$: paused = shaderSettings.paused;
 	$: shader = shaders[shaderIndex] ?? shaders[0];
 
 	// React ONLY when the shader identity changes, not on every pass.
 	let appliedShaderName: string | null = null;
+
 	$: if (shader && material && shader.name !== appliedShaderName) {
+		// eslint-disable-next-line no-useless-assignment
 		appliedShaderName = shader.name;
 		console.log('Shader changed:', shaderIndex, shader.name);
 		toast(`Shader: ${shader.name}`);
 		setShader(shader);
-	}
-
-	export function setPaused(p: boolean): void {
-		const wasPaused = paused;
-
-		updateShaderSettings({ paused: p });
-
-		if (wasPaused && !p) {
-			animationFrameId = requestAnimationFrame(animate);
-		}
 	}
 
 	// Get current FPS (kept for external access if needed)
@@ -218,21 +222,9 @@
 	let fps: number = 0;
 	let frameCount: number = 0;
 	let lastFpsTime: number = 0;
-	let fpsStatus: 'high' | 'medium' | 'low' = 'high';
 
 	// Sync with debug mode - FPS shows when debug is on
-	$: showFps = $debugMode;
-
-	// Update FPS status
-	$: {
-		if (fps >= 50) {
-			fpsStatus = 'high';
-		} else if (fps >= 30) {
-			fpsStatus = 'medium';
-		} else {
-			fpsStatus = 'low';
-		}
-	}
+	$: showFps = debugMode;
 
 	async function initAudio() {
 		try {
@@ -271,7 +263,7 @@
 	}
 
 	function animate() {
-		if (!renderer || !scene || !camera || paused) {
+		if (!renderer || !scene || !camera || stopped) {
 			return;
 		}
 
@@ -346,7 +338,7 @@
 		const updateCamera = () => {
 			const windowAspect = window.innerWidth / window.innerHeight;
 			const contentAspect = 16 / 9;
-			let fov = 45;
+			let fov: number;
 
 			if (windowAspect > contentAspect) {
 				// Window is wider than content - adjust horizontal FOV
@@ -394,6 +386,7 @@
 	let appliedMediaElement: typeof mediaElement = null;
 
 	$: if (mediaElement && materialInitialized && mediaElement !== appliedMediaElement) {
+		// eslint-disable-next-line no-useless-assignment
 		appliedMediaElement = mediaElement;
 		cleanupTexture();
 
@@ -447,9 +440,9 @@
 {#if showFps}
 	<div
 		class="fps-counter"
-		class:high-fps={fpsStatus === 'high'}
-		class:medium-fps={fpsStatus === 'medium'}
-		class:low-fps={fpsStatus === 'low'}
+		class:high-fps={fps >= 50}
+		class:medium-fps={fps >= 30}
+		class:low-fps={fps < 30}
 	>
 		<div class="fps-value">{fps}</div>
 		<div class="fps-label">FPS</div>

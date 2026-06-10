@@ -19,13 +19,15 @@
 	}
 
 	function updateGamepadList(): void {
-		const gamepads = Array.from(navigator.getGamepads()).filter((gp): gp is Gamepad => gp !== null && gp.connected)
+		const gamepads = Array.from(navigator.getGamepads()).filter(
+			(gp): gp is Gamepad => gp !== null && gp.connected
+		);
 		gamepad = gamepads[0] || undefined;
 		console.log('Gamepads:', gamepad);
 	}
 
 	function processGamepadState(): void {
-		if (typeof window === "undefined") return; // Prevent SSR errors
+		if (typeof window === 'undefined') return; // Prevent SSR errors
 
 		if (gamepad) {
 			const buttons = gamepad.buttons.map((button, index) => ({ index, pressed: button.pressed }));

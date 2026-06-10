@@ -6,7 +6,6 @@
 	import Shader from '$lib/shaders/Shader.svelte';
 	import SwitchPro from '$lib/Controllers';
 	import MatrixSwitcher from '$lib/matrix/MatrixSwitcher.svelte';
-	import { debugMode, toggleDebugMode } from '$lib/stores';
 	import Gamepad from '$lib/Gamepad.svelte';
 
 	let videoComponent: Video;
@@ -19,7 +18,10 @@
 	let mediaElement: HTMLVideoElement | HTMLImageElement;
 	let shiftPressed: boolean = false;
 	let enableDebugTimeout: number;
+	let enableTestTimeout: number;
 	let paused = false;
+	let testMode = false;
+	let debugMode = false;
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
 		console.log('Media changed:', element);
@@ -70,8 +72,10 @@
 				} else {
 					controlledComponentIndex++;
 				}
+
 				handled = true;
 			}
+
 			if (index === SwitchPro.D_UP) {
 				controlledComponentIndex = 0;
 				handled = true;
@@ -92,13 +96,29 @@
 
 		if (index === SwitchPro.RIGHT_STICK) {
 			if (pressed) {
+				clearTimeout(enableDebugTimeout);
 				enableDebugTimeout = setTimeout(() => {
-					toggleDebugMode();
+					debugMode = !debugMode;
 
-					toast(`Debug ${$debugMode ? 'ON' : 'OFF'}`);
-				}, 3000) as unknown as number
+					toast(`Debug ${debugMode ? 'ON' : 'OFF'}`);
+				}, 3000) as unknown as number;
 			} else {
 				clearTimeout(enableDebugTimeout);
+			}
+
+			handled = true;
+		}
+
+		if (index === SwitchPro.LEFT_STICK) {
+			if (pressed) {
+				clearTimeout(enableTestTimeout);
+				enableTestTimeout = setTimeout(() => {
+					testMode = !testMode;
+
+					toast(`Test ${testMode ? 'ON' : 'OFF'}`);
+				}, 3000) as unknown as number;
+			} else {
+				clearTimeout(enableTestTimeout);
 			}
 
 			handled = true;
@@ -108,10 +128,6 @@
 			if (!pressed) return;
 
 			paused = !paused;
-			videoComponent?.setPaused(paused);
-			matrixSwitcherComponent?.setPaused(paused);
-			shaderComponent?.setPaused(paused);
-			audioComponent?.setPaused(paused);
 			handled = true;
 
 			toast(paused ? 'Paused' : 'Unpaused');
@@ -124,9 +140,9 @@
 </script>
 
 <MIDI bind:this={midiComponent} />
-<Video bind:this={videoComponent} onMediaChange={handleMediaChange} />
-<Shader bind:this={shaderComponent} {mediaElement} />
-<MatrixSwitcher bind:this={matrixSwitcherComponent} />
-<Audio bind:this={audioComponent} />
-<Gamepad onButtonStateChange={onButtonStateChange} onAxesStateChange={onAxesStateChange} />
+<Video bind:this={videoComponent} onMediaChange={handleMediaChange} {testMode} {paused} />
+<Shader bind:this={shaderComponent} {mediaElement} {debugMode} {paused} {testMode} />
+<MatrixSwitcher bind:this={matrixSwitcherComponent} {paused} />
+<Audio bind:this={audioComponent} {paused} />
+<Gamepad {onButtonStateChange} {onAxesStateChange} />
 <Toaster containerStyle={debugMode ? 'display: block;' : 'display: none;'} />

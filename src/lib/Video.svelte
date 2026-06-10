@@ -14,12 +14,14 @@
 
 	export let videoElement: HTMLVideoElement | null = null;
 	export let imgElement: HTMLImageElement | null = null;
+	export let testMode = false;
+	export let paused = false;
 	let devices: MediaDeviceInfo[] = [];
 	let devicesIds: string[] = ['screen'];
 	let playlists: Playlist[];
 	let hlsInstance: Hls | null = null;
 	let currentStream: MediaStream | null = null;
-	let currentVideoUrl: string | null = null;
+	let currentMediaUrl: string | null = null;
 	let stepper: Stepper;
 	export let onMediaChange: (element: HTMLVideoElement | HTMLImageElement) => void;
 
@@ -56,6 +58,8 @@
 
 		updateVideoSettings({ mode: newMode });
 	}
+
+	$: selectedDeviceId = devicesIds[deviceIndex];
 
 	$: {
 		// Handle media initialization directly within user gesture context
@@ -165,8 +169,8 @@
 			? playlist.pausedMedia
 			: playlist && playlist.entries[shuffle ? shuffleOrder[currentShuffleIndex] : mediaIndex];
 
-	$: isVideo = mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4'));
 	$: shuffleOrder = generateShuffleOrder(playlist?.entries?.length || 0);
+	$: isVideo = !testMode && (mode === 0 || mode === 1 || (media && media.url.endsWith('.mp4')));
 
 	$: {
 		if (onMediaChange && ((isVideo && videoElement) || (!isVideo && imgElement))) {
@@ -174,35 +178,31 @@
 		}
 	}
 
-	$: selectedDeviceId = devicesIds[deviceIndex];
-
 	$: {
 		if (mode === 2 && playlist) {
 			toast(`Playlist: ${playlist.name}`);
 		}
 	}
 
-	$: {
-		if (mode === 2 && media) {
+	$: if (typeof window !== 'undefined') {
+		if (testMode) {
+			const ratio = window.innerWidth / window.innerHeight;
+			if (ratio > 1.7) {
+				// ~16:9
+				playMedia('/test_pattern_16_9.png');
+			} else {
+				// ~4:3
+				playMedia('/test_pattern_4_3.png');
+			}
+		} else if (mode === 2) {
 			if (paused) {
 				if (playlist?.pausedMedia) {
-					cleanupMedia();
 					playMedia(playlist.pausedMedia.url);
 				}
-			} else {
-				if (media.url !== currentVideoUrl) {
-					currentVideoUrl = media.url;
-					cleanupMedia();
-					playMedia(media.url);
-				}
+			} else if (media) {
+				playMedia(media.url);
 			}
 		}
-	}
-
-	let paused = false;
-
-	export function setPaused(p: boolean): void {
-		paused = p;
 	}
 
 	// Generate a shuffled order using the Fisher-Yates algorithm
@@ -381,12 +381,21 @@
 	}
 
 	async function playMedia(url: string) {
-		if (url.endsWith('.mp4')) {
-			if (!videoElement) return;
-			cleanupMedia();
-			videoElement.srcObject = null;
-			videoElement.src = url;
-			videoElement.onended = () => {
+		const isVideo = url.endsWith('.mp4');
+
+		if ((isVideo && !videoElement) || (!isVideo && !imgElement)) return;
+
+		const prevMediaUrl = currentMediaUrl;
+		currentMediaUrl = url;
+
+		if (url === prevMediaUrl) return;
+
+		cleanupMedia();
+
+		if (isVideo) {
+			videoElement!.srcObject = null;
+			videoElement!.src = url;
+			videoElement!.onended = () => {
 				if (loopVideos) {
 					return;
 				}
@@ -394,19 +403,18 @@
 				nextMedia();
 			};
 			try {
-				await videoElement.play();
+				await videoElement!.play();
 			} catch (error) {
 				console.error('Error playing video:', error);
 				toast('Error playing video');
 			}
 		} else {
-			if (!imgElement) return;
-			imgElement.src = url;
+			imgElement!.src = url;
 		}
 	}
 
 	async function preloadMedia(url: string): Promise<void> {
-		if (url === videoElement?.src || url === currentVideoUrl) {
+		if (url === videoElement?.src || url === currentMediaUrl) {
 			return;
 		}
 
@@ -424,11 +432,13 @@
 		try {
 			const resp = await fetch('/api/playlists');
 			let playlistsTmp = await resp.json();
+
 			for (const playlist of playlistsTmp.slice(1)) {
 				if (playlist.entries.length > 0) {
 					await preloadMedia(playlist.entries[0].url);
 				}
 			}
+
 			playlists = playlistsTmp;
 			console.log('Playlists loaded:', playlists);
 		} catch (error) {
