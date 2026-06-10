@@ -14,6 +14,7 @@
 
 	export let videoElement: HTMLVideoElement | null = null;
 	export let imgElement: HTMLImageElement | null = null;
+	export let imgStretchElement: HTMLImageElement | null = null;
 	export let testMode = false;
 	export let paused = false;
 	let devices: MediaDeviceInfo[] = [];
@@ -249,6 +250,9 @@
 		if (imgElement) {
 			imgElement.src = '';
 		}
+		if (imgStretchElement) {
+			imgStretchElement.src = '';
+		}
 	}
 
 	export function onAxesStateChange(axes: ReadonlyArray<number>): void {
@@ -383,7 +387,7 @@
 	async function playMedia(url: string) {
 		const isVideo = url.endsWith('.mp4');
 
-		if ((isVideo && !videoElement) || (!isVideo && !imgElement)) return;
+		if ((isVideo && !videoElement) || (!isVideo && (!imgElement || !imgStretchElement))) return;
 
 		const prevMediaUrl = currentMediaUrl;
 		currentMediaUrl = url;
@@ -410,6 +414,7 @@
 			}
 		} else {
 			imgElement!.src = url;
+			imgStretchElement!.src = url;
 		}
 	}
 
@@ -511,29 +516,32 @@
 	});
 </script>
 
-<video class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos}></video>
-<img alt="img" class:invisible={isVideo} bind:this={imgElement} />
+<video class="bg-media" class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos}></video>
+<img class="bg-media" alt="img-stretch" class:invisible={isVideo} bind:this={imgStretchElement} />
+<img class="fg-media" alt="img" class:invisible={isVideo} bind:this={imgElement} />
 <Stepper bind:this={stepper} onParamsChange={handleParamsChange} />
 
 <style>
-	video {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100vw;
-		height: 100vh;
-		object-fit: cover;
-		z-index: -1;
-		background: black;
-	}
-	img {
-		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100vw;
-		height: 100vh;
-		object-fit: contain;
-		z-index: -1;
-		background: black;
-	}
+    video,
+    img {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+    }
+
+    .bg-media {
+        z-index: -1;
+        object-fit: cover;
+        background: black;
+        filter: blur(12px);
+        transform: scale(1.05);
+    }
+
+    .fg-media {
+        z-index: 0;
+        object-fit: contain;
+        background: transparent;
+    }
 </style>
