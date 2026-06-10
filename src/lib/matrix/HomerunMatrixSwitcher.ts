@@ -1,43 +1,11 @@
-// Type definitions for Web Serial API
-type SerialPort = {
-	readable: ReadableStream<Uint8Array> | null;
-	writable: WritableStream<Uint8Array> | null;
-	open(options: SerialOptions): Promise<void>;
-	close(): Promise<void>;
-};
-
-type SerialOptions = {
-	baudRate: number;
-	dataBits: number;
-	stopBits: number;
-	parity: 'none' | 'even' | 'odd';
-	flowControl: 'none' | 'hardware';
-};
-
 /**
  * HOMERUN Series Matrix Switcher Web Serial API
  * Controls Altinex HOMERUN matrix switchers via RS-232 using Web Serial API
  */
 
-export interface SerialConfig {
-	baudRate: number;
-	dataBits: number;
-	stopBits: number;
-	parity: 'none' | 'even' | 'odd';
-	flowControl: 'none' | 'hardware';
-}
-
 export interface ConnectionStatus {
 	input: number;
 	output: number;
-}
-
-export interface SwitcherInfo {
-	version: string;
-	unitId: number;
-	baudRate: number;
-	matrixSize: { inputs: number; outputs: number };
-	offset: { input: number; output: number };
 }
 
 export class HomerunMatrixSwitcher {
@@ -52,7 +20,7 @@ export class HomerunMatrixSwitcher {
 	private lastConnectTime: number = 0;
 
 	// Default configuration matching manual specifications
-	private config: SerialConfig = {
+	private config: SerialOptions = {
 		baudRate: 2400, // Factory default
 		dataBits: 8,
 		stopBits: 1,
@@ -70,7 +38,7 @@ export class HomerunMatrixSwitcher {
 	/**
 	 * Connect to the HOMERUN switcher
 	 */
-	async connect(config?: Partial<SerialConfig>): Promise<void> {
+	async connect(config?: Partial<SerialOptions>): Promise<void> {
 		if (!('serial' in navigator)) {
 			throw new Error('Web Serial API not supported in this browser');
 		}
@@ -100,7 +68,7 @@ export class HomerunMatrixSwitcher {
 			// Clean up partial connection
 			this.isConnected = false;
 			this.clearReconnect();
-			throw new Error(`Failed to connect: ${error}`);
+			throw new Error(`Failed to connect to HOMERUN Matrix Switcher: ${error}`, { cause: error });
 		}
 	}
 
@@ -108,7 +76,7 @@ export class HomerunMatrixSwitcher {
 	 * Attempt to reconnect if connection was lost
 	 * This can be called after a user gesture (like a click)
 	 */
-	async attemptReconnect(config?: Partial<SerialConfig>): Promise<boolean> {
+	async attemptReconnect(config?: Partial<SerialOptions>): Promise<boolean> {
 		if (this.isConnected) {
 			return true; // Already connected
 		}
@@ -246,7 +214,7 @@ export class HomerunMatrixSwitcher {
 
 			return response;
 		} catch (error) {
-			throw new Error(`Failed to send command '${command}': ${error}`);
+			throw new Error(`Failed to send command '${command}': ${error}`, { cause: error });
 		}
 	}
 
@@ -370,7 +338,9 @@ export class HomerunMatrixSwitcher {
 				}
 			} catch (error) {
 				if (attempts === maxAttempts - 1) {
-					throw new Error(`Failed to read response after ${maxAttempts} attempts: ${error}`);
+					throw new Error(`Failed to read response after ${maxAttempts} attempts: ${error}`, {
+						cause: error
+					});
 				}
 				attempts++;
 			}
@@ -626,14 +596,14 @@ export class HomerunMatrixSwitcher {
 	/**
 	 * Get current configuration
 	 */
-	getConfiguration(): SerialConfig {
+	getConfiguration(): SerialOptions {
 		return { ...this.config };
 	}
 
 	/**
 	 * Get last command response for debugging
 	 */
-	async getDebugInfo(): Promise<{ connected: boolean; config: SerialConfig }> {
+	async getDebugInfo(): Promise<{ connected: boolean; config: SerialOptions }> {
 		return {
 			connected: this.isConnected,
 			config: this.getConfiguration()

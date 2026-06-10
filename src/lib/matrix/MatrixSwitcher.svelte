@@ -157,6 +157,8 @@
 </script>
 
 {#if showModal}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="serial-modal" on:click|stopPropagation={hideModal}>
 		<div class="serial-modal-content" on:click|stopPropagation>
 			<h2>Connect Matrix Switcher</h2>
