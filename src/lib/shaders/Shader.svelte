@@ -426,10 +426,10 @@
 <Stepper
 	bind:this={stepper}
 	onParamsChange={handleParamsChanged}
-	p0={shader?.uniforms.p0?.value as number ?? 0.5}
-	p1={shader?.uniforms.p1?.value as number ?? 0.5}
-	p2={shader?.uniforms.p2?.value as number ?? 0.5}
-	p3={shader?.uniforms.p3?.value as number ?? 0.5}
+	p0={(shader?.uniforms.p0?.value as number) ?? 0.5}
+	p1={(shader?.uniforms.p1?.value as number) ?? 0.5}
+	p2={(shader?.uniforms.p2?.value as number) ?? 0.5}
+	p3={(shader?.uniforms.p3?.value as number) ?? 0.5}
 />
 
 {#if showFps}

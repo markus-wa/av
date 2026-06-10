@@ -516,32 +516,39 @@
 	});
 </script>
 
-<video class="bg-media" class:invisible={!isVideo} autoplay muted bind:this={videoElement} loop={loopVideos}></video>
+<video
+	class="bg-media"
+	class:invisible={!isVideo}
+	autoplay
+	muted
+	bind:this={videoElement}
+	loop={loopVideos}
+></video>
 <img class="bg-media" alt="img-stretch" class:invisible={isVideo} bind:this={imgStretchElement} />
 <img class="fg-media" alt="img" class:invisible={isVideo} bind:this={imgElement} />
 <Stepper bind:this={stepper} onParamsChange={handleParamsChange} />
 
 <style>
-    video,
-    img {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-    }
+	video,
+	img {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+	}
 
-    .bg-media {
-        z-index: -1;
-        object-fit: cover;
-        background: black;
-        filter: blur(12px);
-        transform: scale(1.05);
-    }
+	.bg-media {
+		z-index: -1;
+		object-fit: cover;
+		background: black;
+		filter: blur(12px);
+		transform: scale(1.05);
+	}
 
-    .fg-media {
-        z-index: 0;
-        object-fit: contain;
-        background: transparent;
-    }
+	.fg-media {
+		z-index: 0;
+		object-fit: contain;
+		background: transparent;
+	}
 </style>

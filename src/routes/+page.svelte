@@ -26,10 +26,10 @@
 	let testMode = false;
 	let debugMode = false;
 
-	$: if (sticksPressed === (1|2)) {
-		clearTimeout(enableDebugTimeout)
-		clearTimeout(enableTestTimeout)
-		clearTimeout(resetTimeout)
+	$: if (sticksPressed === (1 | 2)) {
+		clearTimeout(enableDebugTimeout);
+		clearTimeout(enableTestTimeout);
+		clearTimeout(resetTimeout);
 
 		// eslint-disable-next-line no-useless-assignment
 		resetTimeout = setTimeout(() => {
@@ -37,7 +37,7 @@
 			toast(`Settings RESET!`);
 		}, 3000) as unknown as number;
 	} else {
-		clearTimeout(resetTimeout)
+		clearTimeout(resetTimeout);
 	}
 
 	function handleMediaChange(element: HTMLVideoElement | HTMLImageElement): void {
