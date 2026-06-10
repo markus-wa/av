@@ -1,6 +1,6 @@
 export interface Shader {
 	name: string;
-	uniforms: { [key: string]: { value: any; min?: number; max?: number } };
+	uniforms: { [key: string]: { value: unknown; min?: number; max?: number } };
 	vertexShader: string;
 	fragmentShader: string;
 }

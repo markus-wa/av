@@ -45,8 +45,8 @@
 	let geometry: THREE.PlaneGeometry | null = null;
 	let mesh: THREE.Mesh | null = null;
 	const shaders: Shader[] = [
-		CRT,
 		ColorGrading,
+		CRT,
 		EdgeDetection,
 		ChromaticAberration,
 		Pixelation,
@@ -70,11 +70,6 @@
 		console.log('Shader changed:', shaderIndex, shader.name);
 		toast(`Shader: ${shader.name}`);
 		setShader(shader);
-	}
-
-	// Get current FPS (kept for external access if needed)
-	export function getFps(): number {
-		return fps;
 	}
 
 	// Update store when settings change
@@ -431,10 +426,10 @@
 <Stepper
 	bind:this={stepper}
 	onParamsChange={handleParamsChanged}
-	p0={shader?.uniforms.p0?.value !== undefined ? shader.uniforms.p0.value : 0.5}
-	p1={shader?.uniforms.p1?.value !== undefined ? shader.uniforms.p1.value : 0.5}
-	p2={shader?.uniforms.p2?.value !== undefined ? shader.uniforms.p2.value : 0.5}
-	p3={shader?.uniforms.p3?.value !== undefined ? shader.uniforms.p3.value : 0.5}
+	p0={shader?.uniforms.p0?.value as number ?? 0.5}
+	p1={shader?.uniforms.p1?.value as number ?? 0.5}
+	p2={shader?.uniforms.p2?.value as number ?? 0.5}
+	p3={shader?.uniforms.p3?.value as number ?? 0.5}
 />
 
 {#if showFps}
