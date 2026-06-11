@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { toast } from 'svelte-french-toast';
 	import SwitchPro from '$lib/Controllers';
 
 	export let [min, max] = [0, 1];
@@ -27,7 +28,8 @@
 		}
 
 		stepSize = v;
-		console.log('stepSize:', stepSize);
+		console.log('stepSize:', stepSize.toFixed(4));
+		toast(`Step Size: ${stepSize.toFixed(2)}`);
 	}
 
 	function incStepSize(): void {

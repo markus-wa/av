@@ -12,6 +12,8 @@
 		pausedMedia?: { name: string; url: string };
 	}
 
+	const modeNames = ['Camera/Screen', 'HLS', 'Playlists'];
+
 	export let videoElement: HTMLVideoElement | null = null;
 	export let imgElement: HTMLImageElement | null = null;
 	export let imgStretchElement: HTMLImageElement | null = null;
@@ -58,6 +60,7 @@
 		}
 
 		updateVideoSettings({ mode: newMode });
+		toast('Mode: ' + modeNames[newMode]);
 	}
 
 	$: selectedDeviceId = devicesIds[deviceIndex];
@@ -279,6 +282,7 @@
 				updateDeviceIndex(deviceIndex - 1);
 			} else if (mode === 2) {
 				prevMedia();
+				toast(`Previous media`);
 			}
 		} else if (buttonIndex == SwitchPro.RT) {
 			if (!isPressed) return;
@@ -286,6 +290,7 @@
 				updateDeviceIndex(deviceIndex + 1);
 			} else if (mode === 2) {
 				nextMedia();
+				toast(`Next media`);
 			}
 		} else if (buttonIndex == SwitchPro.LT2) {
 			if (!isPressed) return;

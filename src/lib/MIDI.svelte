@@ -46,7 +46,17 @@
 	}
 
 	function updateSelectedMidiIndex(newIndex: number) {
+		if (newIndex < 0) {
+			newIndex = midiOutputs.length - 1;
+		} else if (newIndex >= midiOutputs.length) {
+			newIndex = 0;
+		}
+
 		updateMidiSettings({ selectedMidiIndex: newIndex });
+		midiOutput = midiOutputs[newIndex];
+		lastMidiOutput = midiOutput;
+		console.log('MIDI Device:', midiOutput.name);
+		toast(`MIDI Device: ${midiOutput.name}`);
 	}
 
 	function updateCCValues(c0: number, c1: number, c2: number, c3: number) {
@@ -77,8 +87,6 @@
 						lastMidiOutput = null;
 						if (midiOutputs.length > 0) {
 							updateSelectedMidiIndex(0);
-							midiOutput = midiOutputs[0];
-							lastMidiOutput = midiOutput;
 						} else {
 							midiOutput = null;
 						}
@@ -99,10 +107,6 @@
 					0
 				);
 				updateSelectedMidiIndex(newIndex);
-				if (midiOutputs.length > 0) {
-					midiOutput = midiOutputs[newIndex];
-					lastMidiOutput = midiOutput;
-				}
 			}
 
 			if (midiOutput) {
@@ -134,6 +138,7 @@
 		try {
 			midiOutput.send([0xb0 | channel, controller, value]); // Control Change
 			console.log(`MIDI CC: Channel ${channel}, Controller ${controller}, Value ${value}`);
+			toast(`MIDI CC: ch=${channel} val=${value}`)
 		} catch (error) {
 			console.error('Error sending MIDI CC:', error);
 			toast('MIDI send error');
@@ -179,6 +184,7 @@
 		try {
 			midiOutput.send([0x90 | channel, note, velocity]); // Note ON command
 			console.log(`MIDI Note ON: Channel ${channel}, Note ${note}, Velocity: ${velocity}`);
+			toast(`MIDI Note: ch=${channel}`)
 		} catch (error) {
 			console.error('Error sending MIDI Note ON:', error);
 		}
@@ -204,6 +210,7 @@
 
 		updateStepSize(v);
 		console.log('stepSize:', stepSize);
+		toast(`Step Size: ${stepSize}`);
 	}
 
 	function incStepSize(): void {
@@ -235,16 +242,8 @@
 			if (!isPressed) return;
 
 			if (shiftPressed) {
-				let newIndex = selectedMidiIndex - 1;
-				if (newIndex < 0) {
-					newIndex = midiOutputs.length - 1;
-				}
-
 				if (midiOutputs.length > 0) {
-					updateSelectedMidiIndex(newIndex);
-					midiOutput = midiOutputs[selectedMidiIndex];
-					lastMidiOutput = midiOutput;
-					console.log('Selected MIDI device:', midiOutput.name);
+					updateSelectedMidiIndex(selectedMidiIndex - 1);
 				}
 			} else {
 				decStepSize();
@@ -253,17 +252,8 @@
 			if (!isPressed) return;
 
 			if (shiftPressed) {
-				let newIndex = selectedMidiIndex + 1;
-
-				if (newIndex >= midiOutputs.length) {
-					newIndex = 0;
-				}
-
 				if (midiOutputs.length > 0) {
-					updateSelectedMidiIndex(newIndex);
-					midiOutput = midiOutputs[selectedMidiIndex];
-					lastMidiOutput = midiOutput;
-					console.log('Selected MIDI device:', midiOutput.name);
+					updateSelectedMidiIndex(selectedMidiIndex + 1);
 				}
 			} else {
 				incStepSize();
@@ -271,11 +261,9 @@
 		} else if (buttonIndex === SwitchPro.SCREENSHOT) {
 			shiftPressed = isPressed;
 		} else if (buttonIndex === SwitchPro.HOME) {
+			if (!isPressed) return;
+
 			updateSelectedMidiIndex(0);
-			if (midiOutputs.length > 0) {
-				midiOutput = midiOutputs[0];
-				lastMidiOutput = midiOutput;
-			}
 		}
 
 		const gateCh = gates[buttonIndex];

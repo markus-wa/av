@@ -196,13 +196,13 @@
 			return v;
 		}
 
-		if (material.uniforms.p0 !== undefined && shader.uniforms.p0 !== undefined)
+		if (material.uniforms.p0 && shader.uniforms.p0)
 			material.uniforms.p0.value = clamp(p0, shader.uniforms.p0.min, shader.uniforms.p0.max);
-		if (material.uniforms.p1 !== undefined && shader.uniforms.p1 !== undefined)
+		if (material.uniforms.p1 && shader.uniforms.p1)
 			material.uniforms.p1.value = clamp(p1, shader.uniforms.p1.min, shader.uniforms.p1.max);
-		if (material.uniforms.p2 !== undefined && shader.uniforms.p2 !== undefined)
+		if (material.uniforms.p2 && shader.uniforms.p2)
 			material.uniforms.p2.value = clamp(p2, shader.uniforms.p2.min, shader.uniforms.p2.max);
-		if (material.uniforms.p3 !== undefined && shader.uniforms.p3 !== undefined)
+		if (material.uniforms.p3 && shader.uniforms.p3)
 			material.uniforms.p3.value = clamp(p3, shader.uniforms.p3.min, shader.uniforms.p3.max);
 	}
 

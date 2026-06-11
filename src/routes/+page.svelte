@@ -120,6 +120,7 @@
 
 					toast(`Debug ${debugMode ? 'ON' : 'OFF'}`);
 				}, 3000) as unknown as number;
+				toast('Hold for Debug toggle');
 			} else {
 				sticksPressed = sticksPressed & ~1;
 				clearTimeout(enableDebugTimeout);
@@ -137,6 +138,7 @@
 
 					toast(`Test ${testMode ? 'ON' : 'OFF'}`);
 				}, 3000) as unknown as number;
+				toast('Hold for Test toggle');
 			} else {
 				sticksPressed = sticksPressed & ~2;
 				clearTimeout(enableTestTimeout);
