@@ -25,6 +25,15 @@
 	export let debugMode = false;
 	export let testMode = false;
 	$: stopped = paused || testMode;
+	$: {
+		if (renderer) {
+			if (stopped) {
+				renderer.domElement.style.visibility = 'hidden';
+			} else {
+				renderer.domElement.style.visibility = 'visible';
+			}
+		}
+	}
 
 	watch(
 		() => stopped,

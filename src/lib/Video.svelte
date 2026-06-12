@@ -531,16 +531,16 @@
 	});
 </script>
 
+<img class="bg-media blur -z-10" alt="img-stretch" class:invisible={isVideo} bind:this={imgStretchElement} />
+<img class="fg-media z-0" alt="img" class:invisible={isVideo} bind:this={imgElement} />
 <video
-	class="bg-media"
+	class="bg-media -z-20"
 	class:invisible={!isVideo}
 	autoplay
 	muted
 	bind:this={videoElement}
 	loop={loopVideos}
 ></video>
-<img class="bg-media" alt="img-stretch" class:invisible={isVideo} bind:this={imgStretchElement} />
-<img class="fg-media" alt="img" class:invisible={isVideo} bind:this={imgElement} />
 <Stepper bind:this={stepper} onParamsChange={handleParamsChange} />
 
 <style>
@@ -554,15 +554,16 @@
 	}
 
 	.bg-media {
-		z-index: -1;
 		object-fit: cover;
 		background: black;
-		filter: blur(12px);
-		transform: scale(1.05);
+	}
+
+	.blur {
+      filter: blur(12px);
+      transform: scale(1.05);
 	}
 
 	.fg-media {
-		z-index: 0;
 		object-fit: contain;
 		background: transparent;
 	}
